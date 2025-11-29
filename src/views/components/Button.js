@@ -3,9 +3,9 @@ import {
   TouchableOpacity,
   Text,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import colors from '../../constants/colors';
+import Loader from './Loader';
 
 const Button = ({
   title,
@@ -30,8 +30,10 @@ const Button = ({
       disabled={isDisabled}
       activeOpacity={0.8}>
       {isLoading ? (
-        <ActivityIndicator
+        <Loader
+          size="small"
           color={variant === 'outline' || variant === 'ghost' ? colors.primary : colors.white}
+          variant="gradient-spinner"
         />
       ) : (
         <Text

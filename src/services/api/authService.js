@@ -11,9 +11,9 @@ export const authService = {
         name,
         email,
         password,
-        ...(phone && { phone }),
-        ...(company && { company }),
-        ...(role && { role }),
+        phone: phone || '',
+        company: company || '',
+        role: role || 'member',
       },
       false, // No auth required for registration
     );
@@ -44,13 +44,14 @@ export const authService = {
 
   // Send OTP to email
   sendOTP: async email => {
-    console.log('otp email------', email);
+    console.log('OTP Email:', email);
     const response = await apiClient.post(
       ENDPOINTS.AUTH.SEND_OTP,
       { email },
       false,
     );
-    console.log('otp response------', response);
+    console.log('OTP Response:');
+    console.log(JSON.stringify(response, null, 2));
     return response;
   },
 

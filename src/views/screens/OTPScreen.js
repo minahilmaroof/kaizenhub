@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
+import Loader from '../components/Loader';
 import colors from '../../constants/colors';
 import { authService, profileService } from '../../services/api';
 import { useAppDispatch } from '../../redux/hooks';
@@ -228,7 +228,7 @@ const OTPScreen = ({ navigation, route }) => {
                   style={styles.verifyButton}
                 >
                   {isLoading ? (
-                    <ActivityIndicator color={colors.white} />
+                    <Loader size="small" color={colors.white} variant="gradient-spinner" />
                   ) : (
                     <Text style={styles.verifyButtonText}>Verify OTP</Text>
                   )}

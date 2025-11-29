@@ -25,11 +25,13 @@ const AppBar = ({
         >
           <Icon name="arrow-left" size={18} color={isLight ? colors.white : colors.textPrimary} />
         </TouchableOpacity>
-      ) : (
-        <View style={styles.backButtonPlaceholder} />
-      )}
+      ) : null}
 
-      <View style={[styles.headerText, centerTitle && styles.headerTextCenter]}>
+      <View style={[
+        styles.headerText,
+        centerTitle && styles.headerTextCenter,
+        !showBackButton && styles.headerTextLeft
+      ]}>
         <Text style={[styles.headerTitle, isLight && styles.headerTitleLight]}>
           {title}
         </Text>
@@ -78,15 +80,14 @@ const styles = StyleSheet.create({
   backButtonLight: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
-  backButtonPlaceholder: {
-    width: 44,
-    marginRight: 16,
-  },
   headerText: {
     flex: 1,
   },
   headerTextCenter: {
     alignItems: 'center',
+  },
+  headerTextLeft: {
+    alignItems: 'flex-start',
   },
   headerTitle: {
     fontSize: 24,

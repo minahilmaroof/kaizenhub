@@ -8,25 +8,33 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
+import Loader from '../components/Loader';
 import Icon from 'react-native-vector-icons/FontAwesome6';
 import AppBar from '../components/AppBar';
+import ImagePickerModal from '../components/ImageComponent/ImagePickerModal';
+import colors from '../../constants/colors';
 import { useAppSelector, useAppDispatch } from '../../redux/hooks';
 import { fetchProfileSuccess } from '../../redux/slices/authSlice';
 import { profileService } from '../../services/api';
+import { getImageUrl } from '../../services/api/config';
+import { useToast } from '../../contexts/ToastContext';
 
 const EditProfileScreen = ({ navigation, route }) => {
   const dispatch = useAppDispatch();
   const user = useAppSelector(state => state.auth.user);
+  const { showToast } = useToast();
   
   // Initialize form fields with user data from Redux
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [company, setCompany] = useState(user?.company || '');
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePickerVisible, setImagePickerVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -54,6 +62,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         name: name.trim(),
         ...(phone.trim() && { phone: phone.trim() }),
         ...(company.trim() && { company: company.trim() }),
+        ...(selectedImage && { image: selectedImage }),
       };
 
       const response = await profileService.updateProfile(updateData);
@@ -74,9 +83,10 @@ const EditProfileScreen = ({ navigation, route }) => {
           }
         }
         
-        Alert.alert('Success', 'Profile updated successfully', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+        showToast('Profile updated successfully', 'success');
+        setTimeout(() => {
+          navigation.goBack();
+        }, 1500);
       } else {
         setError(response.message || 'Failed to update profile');
       }
@@ -106,16 +116,28 @@ const EditProfileScreen = ({ navigation, route }) => {
         >
           {/* Avatar Section */}
           <View style={styles.avatarSection}>
-            <LinearGradient
-              colors={['#4A7CFF', '#7C3AED']}
-              style={styles.avatar}
+            {selectedImage || user?.image ? (
+              <Image
+                source={{
+                  uri: selectedImage?.path || selectedImage?.uri || getImageUrl(user?.image),
+                }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <LinearGradient
+                colors={colors.primaryGradient}
+                style={styles.avatar}
+              >
+                <Text style={styles.avatarText}>
+                  {name.charAt(0).toUpperCase()}
+                </Text>
+              </LinearGradient>
+            )}
+            <TouchableOpacity
+              style={styles.changePhotoButton}
+              onPress={() => setImagePickerVisible(true)}
             >
-              <Text style={styles.avatarText}>
-                {name.charAt(0).toUpperCase()}
-              </Text>
-            </LinearGradient>
-            <TouchableOpacity style={styles.changePhotoButton}>
-              <Icon name="camera" size={14} color="#4A7CFF" />
+              <Icon name="camera" size={14} color={colors.primary} />
               <Text style={styles.changePhotoText}>Change Photo</Text>
             </TouchableOpacity>
           </View>
@@ -129,7 +151,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                 <Icon
                   name="user"
                   size={18}
-                  color="#9CA3AF"
+                  color={colors.textMuted}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -137,7 +159,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                   value={name}
                   onChangeText={setName}
                   placeholder="Enter your name"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
             </View>
@@ -149,7 +171,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                 <Icon
                   name="phone"
                   size={18}
-                  color="#9CA3AF"
+                  color={colors.textMuted}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -157,7 +179,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                   value={phone}
                   onChangeText={setPhone}
                   placeholder="Enter your phone number"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textMuted}
                   keyboardType="phone-pad"
                 />
               </View>
@@ -170,7 +192,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                 <Icon
                   name="building"
                   size={18}
-                  color="#9CA3AF"
+                  color={colors.textMuted}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -181,7 +203,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                     setError('');
                   }}
                   placeholder="Enter your company name"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
             </View>
@@ -193,7 +215,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                 <Icon
                   name="envelope"
                   size={18}
-                  color="#9CA3AF"
+                  color={colors.textMuted}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -202,7 +224,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                   editable={false}
                 />
                 <View style={styles.lockedBadge}>
-                  <Icon name="lock" size={12} color="#9CA3AF" />
+                  <Icon name="lock" size={12} color={colors.textMuted} />
                 </View>
               </View>
               <Text style={styles.helperText}>
@@ -225,13 +247,13 @@ const EditProfileScreen = ({ navigation, route }) => {
             disabled={isLoading}
           >
             <LinearGradient
-              colors={['#4A7CFF', '#7C3AED']}
+              colors={colors.primaryGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.saveButton}
             >
               {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <Loader size="small" color="#FFFFFF" variant="gradient-spinner" />
               ) : (
                 <Text style={styles.saveButtonText}>Save Changes</Text>
               )}
@@ -239,6 +261,16 @@ const EditProfileScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Image Picker Modal */}
+      <ImagePickerModal
+        visible={imagePickerVisible}
+        onClose={() => setImagePickerVisible(false)}
+        onImagePicked={(image) => {
+          setSelectedImage(image);
+          setImagePickerVisible(false);
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -246,7 +278,7 @@ const EditProfileScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -267,6 +299,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 12,
+    backgroundColor: colors.borderLight,
+  },
   avatarText: {
     fontSize: 40,
     fontWeight: '700',
@@ -278,12 +317,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.statusUpcomingBg,
   },
   changePhotoText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#4A7CFF',
+    color: colors.primary,
     marginLeft: 6,
   },
   form: {
@@ -295,20 +334,20 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     paddingHorizontal: 16,
   },
   inputDisabled: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.surfaceLight,
   },
   inputIcon: {
     marginRight: 12,
@@ -317,26 +356,29 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#1F2937',
+    color: colors.textPrimary,
   },
   inputTextDisabled: {
-    color: '#9CA3AF',
+    color: colors.textMuted,
   },
   lockedBadge: {
     padding: 6,
   },
   helperText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: colors.textMuted,
     marginTop: 6,
   },
   errorContainer: {
     marginTop: 8,
     marginBottom: 8,
+    backgroundColor: colors.statusFailedBg,
+    padding: 12,
+    borderRadius: 8,
   },
   errorText: {
     fontSize: 14,
-    color: '#EF4444',
+    color: colors.error,
     textAlign: 'center',
   },
   saveButton: {

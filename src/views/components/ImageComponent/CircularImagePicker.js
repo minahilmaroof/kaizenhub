@@ -4,11 +4,11 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import Ionicons from './IconComponent';
 import colors from '../../../config/colors';
 import ImagePickerModal from './ImagePickerModal';
+import Loader from '../Loader';
 
 const CircularImagePicker = ({
   size = 120,
@@ -53,11 +53,9 @@ const CircularImagePicker = ({
           {imageUri ? (
             <>
               {loading && (
-                <ActivityIndicator
-                  style={StyleSheet.absoluteFill}
-                  size="small"
-                  color={colors.primary}
-                />
+                <View style={StyleSheet.absoluteFill}>
+                  <Loader size="small" color={colors.primary} variant="particles" />
+                </View>
               )}
               <Image
                 source={{ uri: imageUri }}

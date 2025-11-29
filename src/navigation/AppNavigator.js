@@ -1,24 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AuthScreen from '../views/screens/AuthScreen';
 import OTPScreen from '../views/screens/OTPScreen';
 import ForgotPasswordScreen from '../views/screens/ForgotPasswordScreen';
 import OnboardingScreen from '../views/screens/OnboardingScreen';
 import BookRoomScreen from '../views/screens/BookRoomScreen';
+import RescheduleBookingScreen from '../views/screens/RescheduleBookingScreen';
+import CreateDayPassScreen from '../views/screens/CreateDayPassScreen';
 import OrderDetailsScreen from '../views/screens/OrderDetailsScreen';
 import CartScreen from '../views/screens/CartScreen';
 import EditProfileScreen from '../views/screens/EditProfileScreen';
 import InvoicesScreen from '../views/screens/InvoicesScreen';
 import InvoiceDetailScreen from '../views/screens/InvoiceDetailScreen';
+import NotificationScreen from '../views/screens/NotificationScreen';
+import WebViewScreen from '../views/screens/WebViewScreen';
 import BottomTabNavigator from './BottomTabNavigator';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
-import { fetchProfileSuccess, initializeAuth } from '../redux/slices/authSlice';
+import { fetchProfileSuccess, initializeAuth, logout } from '../redux/slices/authSlice';
 import storage from '../app/storage';
 import colors from '../constants/colors';
 import { authService, profileService, apiClient } from '../services/api';
+import Loader from '../views/components/Loader';
+import { ToastProvider } from '../contexts/ToastContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +34,55 @@ const AppNavigator = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const navigationRef = useRef(null);
+
+  // Set up logout handler for 401 responses - do this first before any API calls
+  useEffect(() => {
+    const handleLogout = () => {
+      console.log('Logout handler called - logging out user');
+      dispatch(logout());
+      setIsAuthenticated(false);
+      
+      // Function to navigate to AuthScreen
+      const navigateToAuth = () => {
+        if (navigationRef.current) {
+          try {
+            if (navigationRef.current.isReady()) {
+              navigationRef.current.reset({
+                index: 0,
+                routes: [{ name: 'AuthScreen' }],
+              });
+              return true;
+            }
+          } catch (error) {
+            console.error('Error navigating to AuthScreen:', error);
+          }
+        }
+        return false;
+      };
+      
+      // Try to navigate immediately
+      if (!navigateToAuth()) {
+        // If navigation not ready, try again after delays
+        const tryNavigate = (attempts = 0) => {
+          if (attempts < 5) {
+            setTimeout(() => {
+              if (!navigateToAuth() && attempts < 4) {
+                tryNavigate(attempts + 1);
+              }
+            }, 200 * (attempts + 1));
+          }
+        };
+        tryNavigate();
+      }
+    };
+    
+    apiClient.setLogoutHandler(handleLogout);
+    
+    return () => {
+      apiClient.setLogoutHandler(null);
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     checkInitialState();
@@ -56,7 +111,12 @@ const AppNavigator = () => {
           }
         } catch (profileError) {
           console.error('Error fetching profile on app start:', profileError);
-          // Continue even if profile fetch fails
+          // If 401 error, the logout handler will be called automatically
+          // Just make sure we don't continue with authenticated state
+          if (profileError.status === 401) {
+            setIsAuthenticated(false);
+            dispatch(logout());
+          }
         }
       }
     } catch (error) {
@@ -79,14 +139,15 @@ const AppNavigator = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <Loader size="large" color={colors.primary} variant="morphing" />
       </View>
     );
   }
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <ToastProvider>
+        <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           initialRouteName={getInitialRoute()}
           screenOptions={{ headerShown: false }}
@@ -101,6 +162,14 @@ const AppNavigator = () => {
           <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
           <Stack.Screen name="BookRoomScreen" component={BookRoomScreen} />
           <Stack.Screen
+            name="RescheduleBookingScreen"
+            component={RescheduleBookingScreen}
+          />
+          <Stack.Screen
+            name="CreateDayPassScreen"
+            component={CreateDayPassScreen}
+          />
+          <Stack.Screen
             name="OrderDetailsScreen"
             component={OrderDetailsScreen}
           />
@@ -114,8 +183,17 @@ const AppNavigator = () => {
             name="InvoiceDetailScreen"
             component={InvoiceDetailScreen}
           />
+          <Stack.Screen
+            name="NotificationScreen"
+            component={NotificationScreen}
+          />
+          <Stack.Screen
+            name="WebViewScreen"
+            component={WebViewScreen}
+          />
         </Stack.Navigator>
       </NavigationContainer>
+      </ToastProvider>
     </SafeAreaProvider>
   );
 };

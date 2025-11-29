@@ -9,11 +9,12 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
-  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome6';
+import Loader from '../components/Loader';
 import colors from '../../constants/colors';
 import { authService, profileService } from '../../services/api';
 import { useAppDispatch } from '../../redux/hooks';
@@ -36,43 +37,117 @@ const AuthScreen = ({ navigation }) => {
   const [company, setCompany] = useState('');
   const [role, setRole] = useState('member');
   const [showPassword, setShowPassword] = useState(false);
+  const [showRolePicker, setShowRolePicker] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  // Individual field errors
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+
+  const roleOptions = [
+    { id: 'member', label: 'Member' },
+    { id: 'walk_in', label: 'Walk-in' },
+  ];
 
   const validateEmail = email => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
+  const validatePassword = password => {
+    // Password must have at least one special character
+    const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/;
+    return specialCharRegex.test(password);
+  };
+
+  const validateName = name => {
+    // Check if name has trailing spaces
+    if (name !== name.trim()) {
+      return 'Name cannot have spaces at the beginning or end';
+    }
+    // Check if name is empty
+    if (!name.trim()) {
+      return 'Please enter your name';
+    }
+    // Check if name has only spaces
+    if (name.trim().length === 0) {
+      return 'Name cannot be empty';
+    }
+    return '';
+  };
+
+  const validatePhone = phone => {
+    if (phone && phone.trim()) {
+      // Remove spaces, dashes, and parentheses for validation
+      const cleanedPhone = phone.replace(/[\s\-\(\)]/g, '');
+      // Check if phone contains only digits
+      if (!/^\d+$/.test(cleanedPhone)) {
+        return 'Phone number must contain only digits';
+      }
+      // Check minimum length (adjust as needed)
+      if (cleanedPhone.length < 10) {
+        return 'Phone number must be at least 10 digits';
+      }
+    }
+    return '';
+  };
+
   const validateForm = () => {
+    let isValid = true;
+    
+    // Clear all errors first
+    setNameError('');
+    setEmailError('');
+    setPasswordError('');
+    setPhoneError('');
+    setError('');
+
+    // Validate name (register only)
     if (mode === 'register') {
-      if (!name.trim()) {
-        setError('Please enter your name');
-        return false;
+      const nameValidation = validateName(name);
+      if (nameValidation) {
+        setNameError(nameValidation);
+        isValid = false;
       }
     }
 
+    // Validate email
     if (!email.trim()) {
-      setError('Please enter your email address');
-      return false;
+      setEmailError('Please enter your email address');
+      isValid = false;
+    } else if (!validateEmail(email)) {
+      setEmailError('Please enter a valid email address');
+      isValid = false;
     }
 
-    if (!validateEmail(email)) {
-      setError('Please enter a valid email address');
-      return false;
-    }
-
+    // Validate password
     if (!password.trim()) {
-      setError('Please enter your password');
-      return false;
+      setPasswordError('Please enter your password');
+      isValid = false;
+    } else if (mode === 'register') {
+      // Only apply strict password validation for register
+      if (password.length < 6) {
+        setPasswordError('Password must be at least 6 characters');
+        isValid = false;
+      } else if (!validatePassword(password)) {
+        setPasswordError('Password must contain at least one special character');
+        isValid = false;
+      }
+    }
+    // For login, only check if password is not empty (no special character requirement)
+
+    // Validate phone (optional but if provided, must be valid)
+    if (mode === 'register' && phone && phone.trim()) {
+      const phoneValidation = validatePhone(phone);
+      if (phoneValidation) {
+        setPhoneError(phoneValidation);
+        isValid = false;
+      }
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return false;
-    }
-
-    return true;
+    return isValid;
   };
 
   const handleLogin = async () => {
@@ -133,9 +208,9 @@ const AuthScreen = ({ navigation }) => {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
-        ...(phone.trim() && { phone: phone.trim() }),
-        ...(company.trim() && { company: company.trim() }),
-        ...(role && { role }),
+        phone: phone.trim() || '',
+        company: company.trim() || '',
+        role: role || 'member',
       };
 
       const response = await authService.register(userData);
@@ -169,37 +244,6 @@ const AuthScreen = ({ navigation }) => {
       const errorMsg = err.message || 'Something went wrong. Please try again.';
       setError(errorMsg);
       dispatch(loginFailure(errorMsg));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSendOTP = async () => {
-    // Validate email
-    if (!email.trim()) {
-      setError('Please enter your email address');
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const response = await authService.sendOTP(email.trim().toLowerCase());
-      console.log('response------', response);
-      if (response.success) {
-        // Navigate to OTP screen
-        navigation.navigate('OTPScreen', { email: email.trim().toLowerCase() });
-      } else {
-        setError(response.message || 'Failed to send OTP. Please try again.');
-      }
-    } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -242,7 +286,13 @@ const AuthScreen = ({ navigation }) => {
                     ]}
                     onPress={() => {
                       setMode('login');
+                      setEmail('');
+                      setPassword('');
                       setError('');
+                      setNameError('');
+                      setEmailError('');
+                      setPasswordError('');
+                      setPhoneError('');
                     }}
                   >
                     <Text
@@ -261,7 +311,13 @@ const AuthScreen = ({ navigation }) => {
                     ]}
                     onPress={() => {
                       setMode('register');
+                      setEmail('');
+                      setPassword('');
                       setError('');
+                      setNameError('');
+                      setEmailError('');
+                      setPasswordError('');
+                      setPhoneError('');
                     }}
                   >
                     <Text
@@ -291,7 +347,7 @@ const AuthScreen = ({ navigation }) => {
                     <View
                       style={[
                         styles.inputContainer,
-                        error && styles.inputError,
+                        nameError && styles.inputError,
                       ]}
                     >
                       <Icon
@@ -306,13 +362,19 @@ const AuthScreen = ({ navigation }) => {
                         placeholderTextColor={colors.textMuted}
                         value={name}
                         onChangeText={text => {
-                          setName(text);
+                          // Remove trailing spaces
+                          const trimmedText = text.replace(/\s+$/, '');
+                          setName(trimmedText);
+                          setNameError('');
                           setError('');
                         }}
                         autoCapitalize="words"
                         editable={!isLoading}
                       />
                     </View>
+                    {nameError ? (
+                      <Text style={styles.fieldErrorText}>{nameError}</Text>
+                    ) : null}
                   </View>
                 )}
 
@@ -320,7 +382,7 @@ const AuthScreen = ({ navigation }) => {
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Email Address</Text>
                   <View
-                    style={[styles.inputContainer, error && styles.inputError]}
+                    style={[styles.inputContainer, emailError && styles.inputError]}
                   >
                     <Icon
                       name="envelope"
@@ -334,7 +396,10 @@ const AuthScreen = ({ navigation }) => {
                       placeholderTextColor={colors.textMuted}
                       value={email}
                       onChangeText={text => {
-                        setEmail(text);
+                        // Remove trailing spaces
+                        const trimmedText = text.replace(/\s+$/, '');
+                        setEmail(trimmedText);
+                        setEmailError('');
                         setError('');
                       }}
                       keyboardType="email-address"
@@ -343,13 +408,16 @@ const AuthScreen = ({ navigation }) => {
                       editable={!isLoading}
                     />
                   </View>
+                  {emailError ? (
+                    <Text style={styles.fieldErrorText}>{emailError}</Text>
+                  ) : null}
                 </View>
 
                 {/* Password Input */}
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Password</Text>
                   <View
-                    style={[styles.inputContainer, error && styles.inputError]}
+                    style={[styles.inputContainer, passwordError && styles.inputError]}
                   >
                     <Icon
                       name="lock"
@@ -363,7 +431,10 @@ const AuthScreen = ({ navigation }) => {
                       placeholderTextColor={colors.textMuted}
                       value={password}
                       onChangeText={text => {
-                        setPassword(text);
+                        // Remove trailing spaces
+                        const trimmedText = text.replace(/\s+$/, '');
+                        setPassword(trimmedText);
+                        setPasswordError('');
                         setError('');
                       }}
                       secureTextEntry={!showPassword}
@@ -381,13 +452,21 @@ const AuthScreen = ({ navigation }) => {
                       />
                     </TouchableOpacity>
                   </View>
+                  {passwordError ? (
+                    <Text style={styles.fieldErrorText}>{passwordError}</Text>
+                  ) : null}
                 </View>
 
                 {/* Phone Input (Register only) */}
                 {mode === 'register' && (
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Phone (Optional)</Text>
-                    <View style={styles.inputContainer}>
+                    <View
+                      style={[
+                        styles.inputContainer,
+                        phoneError && styles.inputError,
+                      ]}
+                    >
                       <Icon
                         name="phone"
                         size={18}
@@ -400,13 +479,19 @@ const AuthScreen = ({ navigation }) => {
                         placeholderTextColor={colors.textMuted}
                         value={phone}
                         onChangeText={text => {
-                          setPhone(text);
+                          // Remove trailing spaces
+                          const trimmedText = text.replace(/\s+$/, '');
+                          setPhone(trimmedText);
+                          setPhoneError('');
                           setError('');
                         }}
                         keyboardType="phone-pad"
                         editable={!isLoading}
                       />
                     </View>
+                    {phoneError ? (
+                      <Text style={styles.fieldErrorText}>{phoneError}</Text>
+                    ) : null}
                   </View>
                 )}
 
@@ -427,13 +512,47 @@ const AuthScreen = ({ navigation }) => {
                         placeholderTextColor={colors.textMuted}
                         value={company}
                         onChangeText={text => {
-                          setCompany(text);
+                          // Remove trailing spaces
+                          const trimmedText = text.replace(/\s+$/, '');
+                          setCompany(trimmedText);
                           setError('');
                         }}
                         autoCapitalize="words"
                         editable={!isLoading}
                       />
                     </View>
+                  </View>
+                )}
+
+                {/* Role Selection (Register only) */}
+                {mode === 'register' && (
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>User Role</Text>
+                    <TouchableOpacity
+                      style={styles.inputContainer}
+                      onPress={() => setShowRolePicker(true)}
+                      disabled={isLoading}
+                    >
+                      <Icon
+                        name="user-tag"
+                        size={18}
+                        color={colors.textMuted}
+                        style={styles.inputIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.roleSelectText,
+                          !role && styles.placeholderText,
+                        ]}
+                      >
+                        {roleOptions.find(r => r.id === role)?.label || 'Select Role'}
+                      </Text>
+                      <Icon
+                        name="chevron-down"
+                        size={16}
+                        color={colors.textMuted}
+                      />
+                    </TouchableOpacity>
                   </View>
                 )}
 
@@ -452,7 +571,7 @@ const AuthScreen = ({ navigation }) => {
                     style={styles.submitButton}
                   >
                     {isLoading ? (
-                      <ActivityIndicator color={colors.white} />
+                      <Loader size="small" color={colors.white} variant="gradient-spinner" />
                     ) : (
                       <>
                         <Text style={styles.submitButtonText}>
@@ -469,47 +588,90 @@ const AuthScreen = ({ navigation }) => {
                   </LinearGradient>
                 </TouchableOpacity>
 
-                {/* OTP Login Option */}
-                <TouchableOpacity
-                  onPress={handleSendOTP}
-                  style={styles.otpButton}
-                  disabled={isLoading}
-                >
-                  <Text style={styles.otpButtonText}>
-                    Continue with OTP instead
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Divider */}
-                <View style={styles.dividerContainer}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>Or continue with</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-
-                {/* Social Buttons */}
-                <View style={styles.socialContainer}>
-                  <TouchableOpacity style={styles.socialButton}>
-                    <Text style={styles.googleIcon}>G</Text>
-                    <Text style={styles.socialButtonText}>Google</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton}>
-                    <Text style={styles.appleIcon}></Text>
-                    <Text style={styles.socialButtonText}>Apple</Text>
-                  </TouchableOpacity>
-                </View>
-
                 {/* Terms */}
                 <Text style={styles.termsText}>
                   By continuing, you agree to our{' '}
-                  <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-                  <Text style={styles.termsLink}>Privacy Policy</Text>
+                  <Text
+                    style={styles.termsLink}
+                    onPress={() =>
+                      navigation.navigate('WebViewScreen', {
+                        url: 'https://smartkaizen.figma.site/terms',
+                        title: 'Terms of Service',
+                      })
+                    }
+                  >
+                    Terms of Service
+                  </Text>{' '}
+                  and{' '}
+                  <Text
+                    style={styles.termsLink}
+                    onPress={() =>
+                      navigation.navigate('WebViewScreen', {
+                        url: 'https://smartkaizen.figma.site/privacy',
+                        title: 'Privacy Policy',
+                      })
+                    }
+                  >
+                    Privacy Policy
+                  </Text>
                 </Text>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
       </LinearGradient>
+
+      {/* Role Picker Modal */}
+      <Modal
+        visible={showRolePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRolePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select User Role</Text>
+            <ScrollView style={styles.roleList}>
+              {roleOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[
+                    styles.roleOption,
+                    role === option.id && styles.roleOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setRole(option.id);
+                    setShowRolePicker(false);
+                    setError('');
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.roleOptionText,
+                      role === option.id && styles.roleOptionTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {role === option.id && (
+                    <Icon
+                      name="check"
+                      size={18}
+                      color={colors.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowRolePicker(false)}
+            >
+              <Text style={styles.modalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -574,6 +736,12 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 24,
   },
+  fieldErrorText: {
+    color: colors.error,
+    fontSize: 12,
+    marginTop: 6,
+    marginLeft: 4,
+  },
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
@@ -634,15 +802,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
-  otpButton: {
-    marginTop: 16,
-    alignItems: 'center',
-  },
-  otpButtonText: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '500',
-  },
   errorText: {
     color: colors.error,
     fontSize: 13,
@@ -664,66 +823,6 @@ const styles = StyleSheet.create({
   buttonIcon: {
     marginLeft: 8,
   },
-  infoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-    paddingHorizontal: 20,
-  },
-  infoText: {
-    fontSize: 13,
-    color: colors.textMuted,
-    marginLeft: 8,
-    textAlign: 'center',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 28,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    color: colors.textMuted,
-    fontSize: 14,
-    marginHorizontal: 16,
-  },
-  socialContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
-  },
-  googleIcon: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#EA4335',
-    marginRight: 8,
-  },
-  appleIcon: {
-    fontSize: 20,
-    color: colors.black,
-    marginRight: 8,
-  },
-  socialButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.textPrimary,
-  },
   termsText: {
     fontSize: 13,
     color: colors.textMuted,
@@ -734,6 +833,68 @@ const styles = StyleSheet.create({
   termsLink: {
     color: colors.primary,
     fontWeight: '500',
+  },
+  roleSelectText: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.textPrimary,
+    paddingVertical: 16,
+  },
+  placeholderText: {
+    color: colors.textMuted,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '50%',
+    paddingBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  roleList: {
+    maxHeight: 300,
+  },
+  roleOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  roleOptionSelected: {
+    backgroundColor: colors.statusUpcomingBg,
+  },
+  roleOptionText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  roleOptionTextSelected: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  modalCloseButton: {
+    padding: 16,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  ActivityIndicator,
+  RefreshControl,
+  Animated,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from '../components/ImageComponent/IconComponent';
 import ScheduleCard from '../components/ScheduleCard';
+import Loader from '../components/Loader';
 import colors from '../../constants/colors';
 import { useAppSelector, useAppDispatch } from '../../redux/hooks';
 import { fetchProfileSuccess } from '../../redux/slices/authSlice';
@@ -19,7 +22,10 @@ import {
   profileService,
   scheduleService,
   authService,
+  notificationService,
 } from '../../services/api';
+import { getImageUrl } from '../../services/api/config';
+import { useFocusEffect, CommonActions } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -161,6 +167,14 @@ const HomeScreen = ({ navigation }) => {
   const token = useAppSelector(state => state.auth.token);
   const [scheduleData, setScheduleData] = useState([]);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Animation values
+  const quickActionsOpacity = useRef(new Animated.Value(0)).current;
+  const quickActionsTranslateY = useRef(new Animated.Value(20)).current;
+  const scheduleOpacity = useRef(new Animated.Value(0)).current;
+  const scheduleTranslateY = useRef(new Animated.Value(20)).current;
 
   // Fetch profile if authenticated but user data is missing
   useEffect(() => {
@@ -246,9 +260,92 @@ const HomeScreen = ({ navigation }) => {
     fetchSchedule();
   }, [isAuthenticated, user]);
 
+  // Fetch unread notification count
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await notificationService.getUnreadCount();
+      if (response.success && response.data?.count !== undefined) {
+        setUnreadNotificationCount(response.data.count);
+      }
+    } catch (err) {
+      console.error('Error fetching unread count:', err);
+    }
+  };
+
+  // Fetch unread count when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount();
+    }, [])
+  );
+
   // Get user name from Redux state, fallback to 'Guest' if not available
   const userName = user?.name || 'Guest';
   const userInitial = userName.charAt(0).toUpperCase();
+
+  // Animate sections when data is loaded
+  useEffect(() => {
+    if (!isLoadingSchedule) {
+      // Animate Quick Actions
+      Animated.parallel([
+        Animated.timing(quickActionsOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(quickActionsTranslateY, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Animate Schedule section with delay
+      Animated.parallel([
+        Animated.timing(scheduleOpacity, {
+          toValue: 1,
+          duration: 500,
+          delay: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scheduleTranslateY, {
+          toValue: 0,
+          duration: 500,
+          delay: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Reset animations when loading
+      quickActionsOpacity.setValue(0);
+      quickActionsTranslateY.setValue(20);
+      scheduleOpacity.setValue(0);
+      scheduleTranslateY.setValue(20);
+    }
+  }, [isLoadingSchedule]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Fetch schedule
+      const hasToken = await authService.isAuthenticated();
+      if (hasToken) {
+        const response = await scheduleService.getTodaySchedule();
+        if (response && response.success && response.data?.schedule) {
+          const transformedSchedule = response.data.schedule.map(
+            transformScheduleItem,
+          );
+          setScheduleData(transformedSchedule);
+        }
+      }
+      // Fetch unread notification count
+      await fetchUnreadCount();
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleQuickAction = actionId => {
     switch (actionId) {
@@ -259,7 +356,7 @@ const HomeScreen = ({ navigation }) => {
         navigation.navigate('Food');
         break;
       case '3':
-        // Handle One Day Pass
+        navigation.navigate('CreateDayPassScreen');
         break;
       case '4':
         navigation.navigate('Bookings');
@@ -273,6 +370,9 @@ const HomeScreen = ({ navigation }) => {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Header */}
         <View style={styles.header}>
@@ -282,22 +382,84 @@ const HomeScreen = ({ navigation }) => {
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => {
+                try {
+                  // Navigate to NotificationScreen using CommonActions for reliability
+                  const rootNavigator = navigation.getParent() || navigation;
+                  if (rootNavigator) {
+                    rootNavigator.dispatch(
+                      CommonActions.navigate({
+                        name: 'NotificationScreen',
+                      })
+                    );
+                  }
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                  // Fallback to simple navigate
+                  try {
+                    const parent = navigation.getParent();
+                    if (parent) {
+                      parent.navigate('NotificationScreen');
+                    } else {
+                      navigation.navigate('NotificationScreen');
+                    }
+                  } catch (fallbackError) {
+                    console.error('Fallback navigation error:', fallbackError);
+                  }
+                }
+              }}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <View style={styles.notificationIconContainer}>
+                <Icon
+                  name="notifications"
+                  size={24}
+                  color={colors.textPrimary}
+                  type="ionicons"
+                />
+                {unreadNotificationCount > 0 && (
+                  <View style={styles.notificationBadge} pointerEvents="none">
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.avatarButton}
               onPress={() => navigation.navigate('Profile')}
             >
-              <LinearGradient
-                colors={colors.primaryGradient}
-                style={styles.avatar}
-              >
-                <Text style={styles.avatarText}>{userInitial}</Text>
-              </LinearGradient>
+              {user?.image ? (
+                <Image
+                  source={{ uri: getImageUrl(user.image) }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <LinearGradient
+                  colors={colors.primaryGradient}
+                  style={styles.avatar}
+                >
+                  <Text style={styles.avatarText}>{userInitial}</Text>
+                </LinearGradient>
+              )}
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: quickActionsOpacity,
+              transform: [{ translateY: quickActionsTranslateY }],
+            },
+          ]}
+        >
+          <Text style={[styles.sectionTitle, styles.quickActionsTitle]}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
             {quickActions.map(action => (
               <TouchableOpacity
@@ -321,10 +483,18 @@ const HomeScreen = ({ navigation }) => {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </Animated.View>
 
         {/* Today's Schedule */}
-        <View style={styles.section}>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: scheduleOpacity,
+              transform: [{ translateY: scheduleTranslateY }],
+            },
+          ]}
+        >
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today's Schedule</Text>
             {scheduleData.length > 2 && (
@@ -336,7 +506,8 @@ const HomeScreen = ({ navigation }) => {
 
           {isLoadingSchedule ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <Loader size="large" color={colors.primary} variant="morphing" />
+              <Text style={styles.loadingText}>Loading schedule...</Text>
             </View>
           ) : scheduleData.length > 0 ? (
             scheduleData.slice(0, 2).map(item => (
@@ -364,7 +535,7 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.emptyText}>No schedule items for today</Text>
             </View>
           )}
-        </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -408,6 +579,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  notificationButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    overflow: 'visible',
+  },
+  notificationIconContainer: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: colors.error || '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: colors.surface,
+    zIndex: 1,
+  },
+  notificationBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.white,
+  },
   avatarButton: {},
   avatar: {
     width: 44,
@@ -415,6 +622,12 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
   },
   avatarText: {
     fontSize: 18,
@@ -435,6 +648,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  quickActionsTitle: {
+    marginBottom: 16,
   },
   viewAllText: {
     fontSize: 14,
@@ -474,8 +690,18 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   loadingContainer: {
-    paddingVertical: 20,
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 40,
+    minHeight: 200,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   emptyContainer: {
     paddingVertical: 20,

@@ -1,24 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  RefreshControl,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
+import Icon from '../components/ImageComponent/IconComponent';
 import AppBar from '../components/AppBar';
 import ConfirmationPopup from '../components/ConfirmationPopup';
 import colors from '../../constants/colors';
-import { authService } from '../../services/api';
+import { authService, profileService } from '../../services/api';
+import { getImageUrl } from '../../services/api/config';
 import { useAppSelector, useAppDispatch } from '../../redux/hooks';
 import { logout } from '../../redux/slices/authSlice';
 
 const menuItems = [
-  { id: '1', title: 'Edit Profile', icon: '👤' },
-  { id: '2', title: 'My Bookings', icon: '🔖' },
-  { id: '3', title: 'Invoices', icon: '📄' },
+  { id: '1', title: 'Edit Profile', icon: 'user', type: 'fontAwesome' },
+  { id: '2', title: 'My Bookings', icon: 'bookmark', type: 'fontAwesome' },
+  { id: '3', title: 'Invoices', icon: 'file-invoice', type: 'fontAwesome' },
 ];
 
 const ProfileScreen = ({ navigation }) => {
@@ -26,6 +30,9 @@ const ProfileScreen = ({ navigation }) => {
   const user = useAppSelector(state => state.auth.user);
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [bookingsCount, setBookingsCount] = useState(0);
+  const [ordersCount, setOrdersCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Get user data from Redux, with fallbacks
   const userName = user?.name || 'Guest';
@@ -34,11 +41,56 @@ const ProfileScreen = ({ navigation }) => {
   const userCompany = user?.company || '';
   const userInitial = userName.charAt(0).toUpperCase();
 
-  // Stats (can be fetched from API later)
+  const fetchProfileData = async () => {
+    try {
+      const response = await profileService.getProfile();
+      if (response.success && response.data) {
+        // Extract counts from API response
+        const bookings = response.data.bookings_count || 0;
+        const orders = response.data.orders_count || 0;
+        setBookingsCount(bookings);
+        setOrdersCount(orders);
+      }
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+      // Keep default values (0) on error
+    }
+  };
+
+  // Fetch profile data to get booking and order counts
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProfileData();
+    setRefreshing(false);
+  };
+
+  // Format wallet balance to be more compact - show K for thousands
+  const formatWalletBalance = (balance) => {
+    if (!balance) return '0';
+    const amount = parseFloat(balance);
+    
+    if (amount >= 1000000) {
+      // For millions, show as M (e.g., 1.5M)
+      return `${(amount / 1000000).toFixed(1)}M`;
+    } else if (amount >= 1000) {
+      // For thousands, show as K (e.g., 5K, 1.5K)
+      const thousands = amount / 1000;
+      // If it's a whole number, don't show decimals (e.g., 5K instead of 5.0K)
+      return thousands % 1 === 0 ? `${thousands}K` : `${thousands.toFixed(1)}K`;
+    }
+    // For amounts less than 1000, show as is
+    return amount.toFixed(0);
+  };
+
+  // Stats
   const stats = {
-    bookings: 0,
-    orders: 0,
-    spent: user?.wallet_balance ? `₹${parseFloat(user.wallet_balance).toFixed(2)}` : '₹0.00',
+    bookings: bookingsCount,
+    orders: ordersCount,
+    walletBalance: user?.wallet_balance ? formatWalletBalance(user.wallet_balance) : '0',
   };
 
   const handleLogout = async () => {
@@ -87,7 +139,7 @@ const ProfileScreen = ({ navigation }) => {
         <SafeAreaView edges={['top']}>
           <AppBar
             title="Profile"
-            onBackPress={() => navigation.goBack()}
+            showBackButton={false}
             variant="light"
           />
         </SafeAreaView>
@@ -95,12 +147,19 @@ const ProfileScreen = ({ navigation }) => {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.profileInfo}>
-            <LinearGradient
-              colors={colors.primaryGradient}
-              style={styles.avatar}
-            >
-              <Text style={styles.avatarText}>{userInitial}</Text>
-            </LinearGradient>
+            {user?.image ? (
+              <Image
+                source={{ uri: getImageUrl(user.image) }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <LinearGradient
+                colors={colors.primaryGradient}
+                style={styles.avatar}
+              >
+                <Text style={styles.avatarText}>{userInitial}</Text>
+              </LinearGradient>
+            )}
             <View style={styles.userDetails}>
               <Text style={styles.userName}>{userName}</Text>
               <Text style={styles.userEmail}>{userEmail}</Text>
@@ -128,9 +187,12 @@ const ProfileScreen = ({ navigation }) => {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: '#F5842C' }]}>
-                {stats.spent}
-              </Text>
+              <View style={styles.walletContainer}>
+                <Text style={[styles.statValue, { color: '#F5842C' }]}>
+                  {stats.walletBalance}
+                </Text>
+                <Text style={styles.walletCurrency}>PKR</Text>
+              </View>
               <Text style={styles.statLabel}>Wallet Balance</Text>
             </View>
           </View>
@@ -142,6 +204,9 @@ const ProfileScreen = ({ navigation }) => {
         style={styles.menuContainer}
         contentContainerStyle={styles.menuContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {menuItems.map(item => (
           <TouchableOpacity
@@ -151,7 +216,12 @@ const ProfileScreen = ({ navigation }) => {
             activeOpacity={0.7}
           >
             <View style={styles.menuIconContainer}>
-              <Text style={styles.menuIcon}>{item.icon}</Text>
+              <Icon
+                name={item.icon}
+                size={20}
+                color={colors.primary}
+                type={item.type}
+              />
             </View>
             <Text style={styles.menuTitle}>{item.title}</Text>
             <Text style={styles.menuArrow}>›</Text>
@@ -214,6 +284,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F3F4F6',
+  },
   avatarText: {
     fontSize: 32,
     fontWeight: '700',
@@ -262,6 +338,19 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginBottom: 4,
   },
+  walletContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  walletCurrency: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F5842C',
+    marginLeft: 4,
+    opacity: 0.8,
+  },
   statLabel: {
     fontSize: 13,
     color: '#6B7280',
@@ -300,9 +389,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
-  },
-  menuIcon: {
-    fontSize: 20,
   },
   menuTitle: {
     flex: 1,

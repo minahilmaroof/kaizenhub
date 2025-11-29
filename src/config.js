@@ -2,7 +2,7 @@ import Config from "react-native-config";
 
 
 //const apiUrl = 'https://nbl.onyxtec.io/';
-const apiUrl = 'https://4a9e53b59c2a.ngrok-free.app/';
+const apiUrl = 'http://smartkaizenapp.onyxtec.io/';
 
 export default {
    baseURL: `${apiUrl}api`,

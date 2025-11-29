@@ -22,7 +22,7 @@ const TYPE_CONFIG = {
   pass: {
     icon: 'calendar-day',
     type: 'fontAwesome',
-    gradient: ['#22C55E', '#10B981'],
+    gradient:['#4A7CFF', '#6366F1'],
     statusColor: colors.success,
     statusBg: colors.statusPaidBg,
   },

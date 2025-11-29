@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,23 +6,29 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
+import AppBar from '../components/AppBar';
+import Loader from '../components/Loader';
+import { ordersService } from '../../services/api';
+import colors from '../../constants/colors';
 
 const CartScreen = ({ navigation, route }) => {
-  const cartItems = route?.params?.cartItems || [
-    {
-      id: '1',
-      name: 'Cappuccino',
-      price: 80,
-      quantity: 1,
-      emoji: '☕',
-    },
-  ];
-
+  const initialCartItems = route?.params?.cartItems || [];
+  const [cartItems, setCartItems] = useState(initialCartItems);
   const [deliveryLocation, setDeliveryLocation] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [error, setError] = useState('');
+
+  // Update cart items when route params change
+  useEffect(() => {
+    if (route?.params?.cartItems) {
+      setCartItems(route.params.cartItems);
+    }
+  }, [route?.params?.cartItems]);
 
   // Calculate totals
   const itemTotal = cartItems.reduce(
@@ -33,32 +39,92 @@ const CartScreen = ({ navigation, route }) => {
   const gstAmount = Math.round((itemTotal * gstPercentage) / 100);
   const totalAmount = itemTotal + gstAmount;
 
-  const handlePlaceOrder = () => {
-    const orderData = {
-      items: cartItems,
-      deliveryLocation,
-      specialInstructions,
-      itemTotal,
-      gstAmount,
-      totalAmount,
-    };
-    console.log('Order placed:', orderData);
-    // TODO: Process order
-    navigation.navigate('Home');
+  const handlePlaceOrder = async () => {
+    if (cartItems.length === 0) {
+      Alert.alert('Empty Cart', 'Please add items to your cart before placing an order.');
+      return;
+    }
+
+    if (!deliveryLocation || !deliveryLocation.trim()) {
+      setError('Please enter a delivery location before placing your order.');
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    setError('');
+
+    try {
+      // Prepare order data according to API format
+      const orderData = {
+        items: cartItems.map(item => ({
+          food_item_id: item.food_item_id || parseInt(item.id),
+          quantity: item.quantity,
+        })),
+        ...(deliveryLocation.trim() && { delivery_location: deliveryLocation.trim() }),
+        ...(specialInstructions.trim() && { notes: specialInstructions.trim() }),
+        // payment_method: 'wallet', // You can add payment method selection
+      };
+
+      const response = await ordersService.createOrder(orderData);
+
+      if (response.success) {
+        Alert.alert(
+          'Order Placed!',
+          'Your order has been placed successfully.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate to home or bookings screen
+                navigation.navigate('MainTabs', { screen: 'Home' });
+              },
+            },
+          ]
+        );
+      } else {
+        setError(response.message || 'Failed to place order. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error placing order:', err);
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
+  const handleRemoveItem = (itemId) => {
+    const updatedItems = cartItems.filter(item => 
+      item.id !== itemId && item.food_item_id !== itemId
+    );
+    setCartItems(updatedItems);
+  };
+
+  const handleUpdateQuantity = (itemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      handleRemoveItem(itemId);
+      return;
+    }
+    const updatedItems = cartItems.map(item =>
+      (item.id === itemId || item.food_item_id === itemId)
+        ? { ...item, quantity: newQuantity }
+        : item
+    );
+    setCartItems(updatedItems);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cart</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <AppBar
+        title="Cart"
+        onBackPress={() => {
+          // Pass updated cart items back to FoodScreen when going back
+          navigation.navigate('MainTabs', {
+            screen: 'Food',
+            params: { cartItems: cartItems },
+          });
+        }}
+        showBackButton
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -67,21 +133,55 @@ const CartScreen = ({ navigation, route }) => {
         {/* Order Summary */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Order Summary</Text>
-          {cartItems.map(item => (
-            <View key={item.id} style={styles.orderItem}>
-              <View style={styles.orderItemLeft}>
-                <Text style={styles.orderItemEmoji}>{item.emoji}</Text>
-                <View>
-                  <Text style={styles.orderItemName}>{item.name}</Text>
-                  <Text style={styles.orderItemQty}>Qty: {item.quantity}</Text>
+          {cartItems.length === 0 ? (
+            <View style={styles.emptyCartContainer}>
+              <Text style={styles.emptyCartText}>Your cart is empty</Text>
+            </View>
+          ) : (
+            cartItems.map((item, index) => (
+              <View key={item.id || index} style={styles.orderItem}>
+                <View style={styles.orderItemLeft}>
+                  <Text style={styles.orderItemEmoji}>{item.emoji || '🍽️'}</Text>
+                  <View style={styles.orderItemInfo}>
+                    <Text style={styles.orderItemName}>{item.name}</Text>
+                    <View style={styles.quantityControls}>
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => handleUpdateQuantity(item.id || item.food_item_id, item.quantity - 1)}
+                      >
+                        <Text style={styles.quantityButtonText}>−</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.quantityValue}>{item.quantity}</Text>
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => handleUpdateQuantity(item.id || item.food_item_id, item.quantity + 1)}
+                      >
+                        <Text style={styles.quantityButtonText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.orderItemRight}>
+                  <Text style={styles.orderItemPrice}>
+                    PKR {item.price * item.quantity}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveItem(item.id || item.food_item_id)}
+                  >
+                    <Text style={styles.removeButtonText}>×</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-              <Text style={styles.orderItemPrice}>
-                ₹{item.price * item.quantity}
-              </Text>
-            </View>
-          ))}
+            ))
+          )}
         </View>
+
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
 
         {/* Delivery Location */}
         <View style={styles.card}>
@@ -119,37 +219,44 @@ const CartScreen = ({ navigation, route }) => {
           <Text style={styles.cardTitle}>Price Details</Text>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>
-              Item Total ({cartItems.length} × ₹{itemTotal / (cartItems[0]?.quantity || 1)})
+              Item Total ({cartItems.length} × PKR {itemTotal / (cartItems[0]?.quantity || 1)})
             </Text>
-            <Text style={styles.priceValue}>₹{itemTotal}</Text>
+            <Text style={styles.priceValue}>PKR {itemTotal}</Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>GST ({gstPercentage}%)</Text>
-            <Text style={styles.priceValue}>₹{gstAmount}</Text>
+            <Text style={styles.priceValue}>PKR {gstAmount}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.priceRow}>
             <Text style={styles.totalLabel}>Total Amount</Text>
-            <Text style={styles.totalValue}>₹{totalAmount}</Text>
+            <Text style={styles.totalValue}>PKR {totalAmount}</Text>
           </View>
         </View>
       </ScrollView>
 
       {/* Place Order Button */}
-      <View style={styles.bottomContainer}>
-        <TouchableOpacity
-          style={styles.placeOrderButton}
-          onPress={handlePlaceOrder}
-          activeOpacity={0.9}>
-          <LinearGradient
-            colors={['#F5842C', '#E85D04']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.placeOrderGradient}>
-            <Text style={styles.placeOrderText}>Place Order - ₹{totalAmount}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+      {cartItems.length > 0 && (
+        <View style={styles.bottomContainer}>
+          <TouchableOpacity
+            style={styles.placeOrderButton}
+            onPress={handlePlaceOrder}
+            activeOpacity={0.9}
+            disabled={isPlacingOrder}>
+            <LinearGradient
+              colors={colors.secondaryGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.placeOrderGradient}>
+              {isPlacingOrder ? (
+                <Loader size="small" color={colors.white} variant="gradient-spinner" />
+              ) : (
+                <Text style={styles.placeOrderText}>Place Order - PKR {totalAmount}</Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -158,33 +265,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 22,
-    color: '#1F2937',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  placeholder: {
-    width: 44,
   },
   scrollView: {
     flex: 1,
@@ -221,25 +301,86 @@ const styles = StyleSheet.create({
   orderItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   orderItemEmoji: {
     fontSize: 32,
     marginRight: 12,
   },
+  orderItemInfo: {
+    flex: 1,
+  },
   orderItemName: {
     fontSize: 15,
     fontWeight: '600',
     color: '#1F2937',
+    marginBottom: 8,
   },
-  orderItemQty: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 2,
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quantityButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  quantityValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  orderItemRight: {
+    alignItems: 'flex-end',
+    gap: 8,
   },
   orderItemPrice: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
+  },
+  removeButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
+  emptyCartContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyCartText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  errorContainer: {
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
   },
   inputContainer: {
     flexDirection: 'row',

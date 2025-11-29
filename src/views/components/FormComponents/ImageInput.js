@@ -5,12 +5,12 @@ import {
   TouchableOpacity,
   Modal,
   TouchableWithoutFeedback,
-  ActivityIndicator,
   PermissionsAndroid,Platform
 } from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 import AppText from "../AppText";
 import Icon from "../ImageComponent/IconComponent";
+import Loader from "../Loader";
 
 function ImageInput({ onChangeImage, currentCount }) {
   const [uploading, setUploading] = useState(false);
@@ -95,7 +95,7 @@ async function requestGalleryPermission() {
         disabled={uploading}
       >
         {uploading ? (
-          <ActivityIndicator size="small" color="#999" />
+          <Loader size="small" color="#999" variant="gradient-spinner" />
         ) : (
           <Icon name="camera" size={36} color="#999" />
         )}

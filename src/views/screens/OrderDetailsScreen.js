@@ -1,26 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
+import AppBar from '../components/AppBar';
+import Loader from '../components/Loader';
+import { foodService } from '../../services/api';
+import colors from '../../constants/colors';
+
+const getCategoryColor = category => {
+  switch (category) {
+    case 'beverages':
+      return { bg: '#FFF3E8', text: '#F5842C', emoji: '☕' };
+    case 'snacks':
+      return { bg: '#FEF3C7', text: '#D97706', emoji: '🍪' };
+    case 'meals':
+      return { bg: '#ECFDF5', text: '#059669', emoji: '🍱' };
+    default:
+      return { bg: '#F3F4F6', text: '#6B7280', emoji: '🍽️' };
+  }
+};
 
 const OrderDetailsScreen = ({ navigation, route }) => {
-  const item = route?.params?.item || {
+  const itemId = route?.params?.itemId;
+  const initialItem = route?.params?.item;
+  
+  const [item, setItem] = useState(initialItem || {
     id: '1',
-    name: 'Cappuccino',
-    description: 'Rich espresso with steamed milk',
-    price: 80,
+    name: 'Loading...',
+    description: '',
+    price: 0,
     category: 'beverages',
     emoji: '☕',
     bgColor: '#FFF3E8',
-  };
-
+  });
   const [quantity, setQuantity] = useState(1);
+  const [isLoading, setIsLoading] = useState(!!itemId);
+  const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (itemId) {
+      fetchFoodItemDetails();
+    }
+  }, [itemId]);
+
+  const fetchFoodItemDetails = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const response = await foodService.getFoodItemDetails(itemId);
+      if (response.success && response.data) {
+        const foodItem = response.data;
+        const categoryStyle = getCategoryColor(foodItem.type || foodItem.category);
+        setItem({
+          id: foodItem.id?.toString(),
+          name: foodItem.name || 'Food Item',
+          description: foodItem.description || '',
+          price: parseFloat(foodItem.price || 0),
+          category: foodItem.type || foodItem.category || 'meals',
+          emoji: categoryStyle.emoji,
+          bgColor: categoryStyle.bg,
+          ...foodItem, // Keep original data
+        });
+      } else {
+        setError(response.message || 'Failed to load item details');
+      }
+    } catch (err) {
+      console.error('Error fetching food item details:', err);
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const incrementQuantity = () => {
     setQuantity(quantity + 1);
@@ -35,48 +94,104 @@ const OrderDetailsScreen = ({ navigation, route }) => {
   const totalPrice = item.price * quantity;
 
   const handleAddToCart = () => {
-    const orderData = {
-      item,
-      quantity,
-      totalPrice,
-    };
-    console.log('Added to cart:', orderData);
-    // TODO: Add to cart state/redux
-    navigation.goBack();
-  };
+    // Get existing cart items from route params or use empty array
+    const existingCartItems = route?.params?.cartItems || [];
+    
+    // Check if item already exists in cart
+    const existingItemIndex = existingCartItems.findIndex(
+      cartItem => cartItem.id === item.id || cartItem.food_item_id === item.id
+    );
 
-  const getCategoryColor = category => {
-    switch (category) {
-      case 'beverages':
-        return { bg: '#FFF3E8', text: '#F5842C' };
-      case 'snacks':
-        return { bg: '#FEF3C7', text: '#D97706' };
-      case 'meals':
-        return { bg: '#ECFDF5', text: '#059669' };
-      default:
-        return { bg: '#F3F4F6', text: '#6B7280' };
+    let updatedCartItems;
+    if (existingItemIndex >= 0) {
+      // Update quantity if item already exists
+      updatedCartItems = [...existingCartItems];
+      updatedCartItems[existingItemIndex] = {
+        ...updatedCartItems[existingItemIndex],
+        quantity: updatedCartItems[existingItemIndex].quantity + quantity,
+      };
+    } else {
+      // Add new item to cart
+      const cartItem = {
+        id: item.id,
+        food_item_id: parseInt(item.id) || item.food_item_id || item.id,
+        name: item.name,
+        price: item.price,
+        quantity: quantity,
+        emoji: item.emoji,
+        description: item.description,
+        category: item.category,
+      };
+      updatedCartItems = [...existingCartItems, cartItem];
     }
+
+    // Navigate to CartScreen with updated cart items
+    navigation.navigate('CartScreen', { cartItems: updatedCartItems });
   };
 
   const categoryColors = getCategoryColor(item.category);
 
+  const onRefresh = async () => {
+    if (itemId) {
+      setRefreshing(true);
+      await fetchFoodItemDetails();
+      setRefreshing(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppBar
+          title="Order Details"
+          onBackPress={() => navigation.goBack()}
+          showBackButton
+        />
+        <View style={styles.loadingContainer}>
+          <Loader size="large" color={colors.secondary} variant="particles" />
+          <Text style={styles.loadingText}>Loading item details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error && !item.name) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppBar
+          title="Order Details"
+          onBackPress={() => navigation.goBack()}
+          showBackButton
+        />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={fetchFoodItemDetails}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Details</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <AppBar
+        title="Order Details"
+        onBackPress={() => navigation.goBack()}
+        showBackButton
+      />
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }>
         {/* Item Card */}
         <View style={styles.itemCard}>
           {/* Item Image */}
@@ -98,7 +213,7 @@ const OrderDetailsScreen = ({ navigation, route }) => {
                 {item.category}
               </Text>
             </View>
-            <Text style={styles.itemPrice}>₹{item.price}</Text>
+            <Text style={styles.itemPrice}>PKR {item.price}</Text>
           </View>
         </View>
 
@@ -131,14 +246,20 @@ const OrderDetailsScreen = ({ navigation, route }) => {
             <Text style={styles.summaryLabel}>
               {item.name} × {quantity}
             </Text>
-            <Text style={styles.summaryValue}>₹{item.price * quantity}</Text>
+            <Text style={styles.summaryValue}>PKR {item.price * quantity}</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>₹{totalPrice}</Text>
+            <Text style={styles.totalValue}>PKR {totalPrice}</Text>
           </View>
         </View>
+        
+        {error ? (
+          <View style={styles.errorMessageContainer}>
+            <Text style={styles.errorMessageText}>{error}</Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Add to Cart Button */}
@@ -148,11 +269,11 @@ const OrderDetailsScreen = ({ navigation, route }) => {
           onPress={handleAddToCart}
           activeOpacity={0.9}>
           <LinearGradient
-            colors={['#F5842C', '#E85D04']}
+            colors={colors.secondaryGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.addToCartGradient}>
-            <Text style={styles.addToCartText}>Add to Cart - ₹{totalPrice}</Text>
+            <Text style={styles.addToCartText}>Add to Cart - PKR {totalPrice}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -164,33 +285,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 22,
-    color: '#1F2937',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  placeholder: {
-    width: 44,
   },
   scrollView: {
     flex: 1,
@@ -371,6 +465,53 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  errorMessageContainer: {
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  errorMessageText: {
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
   },
 });
 

@@ -79,7 +79,7 @@ const InvoiceCard = ({
       )}
 
       <View style={styles.cardFooter}>
-        <Text style={styles.amount}>₹{amount}</Text>
+        <Text style={styles.amount}>PKR {amount}</Text>
         <Text style={styles.arrow}>›</Text>
       </View>
     </TouchableOpacity>

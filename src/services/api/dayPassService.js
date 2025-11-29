@@ -9,11 +9,13 @@ export const dayPassService = {
   },
 
   // Purchase a day pass
-  purchaseDayPass: async (date, paymentMethod = 'wallet') => {
+  purchaseDayPass: async (date, paymentMethod = 'wallet', seatType = 'dedicated') => {
     // paymentMethod: 'wallet' | 'invoice' | 'cash'
+    // seatType: 'shared' | 'dedicated'
     const response = await apiClient.post(ENDPOINTS.DAY_PASSES.PURCHASE, {
       date,
       payment_method: paymentMethod,
+      seat_type: seatType,
     });
     return response;
   },

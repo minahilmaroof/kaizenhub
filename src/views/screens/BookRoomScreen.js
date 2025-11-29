@@ -8,11 +8,12 @@ import {
   TextInput,
   Platform,
   Modal,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
+import AppBar from '../components/AppBar';
+import Loader from '../components/Loader';
 import { bookingsService } from '../../services/api';
 
 const timeSlots = [
@@ -49,11 +50,47 @@ const BookRoomScreen = ({ navigation, route }) => {
     bgColor: '#E0E7FF',
   };
 
-  const [selectedDate, setSelectedDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [attendees, setAttendees] = useState(1);
-  const [purpose, setPurpose] = useState('');
+  const bookingId = route?.params?.bookingId;
+  const bookingData = route?.params?.bookingData;
+  const isReschedule = route?.params?.isReschedule || false;
+
+  // Helper function to convert 24-hour time to 12-hour format
+  const convertTo12Hour = (time24h) => {
+    if (!time24h) return '';
+    const [hours, minutes] = time24h.split(':');
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+  };
+
+  // Initialize form with booking data if rescheduling
+  const getInitialDate = () => {
+    if (bookingData?.date) {
+      return new Date(bookingData.date);
+    }
+    return '';
+  };
+
+  const getInitialStartTime = () => {
+    if (bookingData?.start_time) {
+      return convertTo12Hour(bookingData.start_time);
+    }
+    return '';
+  };
+
+  const getInitialEndTime = () => {
+    if (bookingData?.end_time) {
+      return convertTo12Hour(bookingData.end_time);
+    }
+    return '';
+  };
+
+  const [selectedDate, setSelectedDate] = useState(getInitialDate());
+  const [startTime, setStartTime] = useState(getInitialStartTime());
+  const [endTime, setEndTime] = useState(getInitialEndTime());
+  const [attendees, setAttendees] = useState(bookingData?.number_of_attendees || 1);
+  const [purpose, setPurpose] = useState(bookingData?.purpose || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
@@ -133,37 +170,68 @@ const BookRoomScreen = ({ navigation, route }) => {
     setIsLoading(true);
 
     try {
-      const bookingData = {
-        room_id: room.id,
-        date: formatDateForAPI(selectedDate),
-        start_time: convertTo24Hour(startTime),
-        end_time: convertTo24Hour(endTime),
-        purpose: purpose.trim(),
-        number_of_attendees: attendees,
-      };
+      if (isReschedule && bookingId) {
+        // Reschedule existing booking
+        const rescheduleData = {
+          date: formatDateForAPI(selectedDate),
+          start_time: convertTo24Hour(startTime),
+          end_time: convertTo24Hour(endTime),
+        };
 
-      console.log('Creating booking with data:', bookingData);
+        console.log('Rescheduling booking with data:', rescheduleData);
 
-      const response = await bookingsService.createBooking(bookingData);
+        const response = await bookingsService.rescheduleBooking(bookingId, rescheduleData);
 
-      if (response.success) {
-        Alert.alert(
-          'Success',
-          'Room booked successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                navigation.goBack();
+        if (response.success) {
+          Alert.alert(
+            'Success',
+            response.message || 'Booking rescheduled successfully!',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.goBack();
+                },
               },
-            },
-          ],
-        );
+            ],
+          );
+        } else {
+          setError(response.message || 'Failed to reschedule booking. Please try again.');
+        }
       } else {
-        setError(response.message || 'Failed to create booking. Please try again.');
+        // Create new booking
+        const newBookingData = {
+          room_id: room.id,
+          date: formatDateForAPI(selectedDate),
+          start_time: convertTo24Hour(startTime),
+          end_time: convertTo24Hour(endTime),
+          purpose: purpose.trim(),
+          number_of_attendees: attendees,
+        };
+
+        console.log('Creating booking with data:', newBookingData);
+
+        const response = await bookingsService.createBooking(newBookingData);
+
+        if (response.success) {
+          Alert.alert(
+            'Success',
+            'Room booked successfully!',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.goBack();
+                },
+              },
+            ],
+          );
+        } else {
+          setError(response.message || 'Failed to create booking. Please try again.');
+        }
       }
     } catch (err) {
-      console.error('Error creating booking:', err);
+      console.error('Error processing booking:', err);
       const errorMessage =
         err.data?.message || err.message || 'Something went wrong. Please try again.';
       setError(errorMessage);
@@ -253,16 +321,11 @@ const BookRoomScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Book Room</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <AppBar
+        title={isReschedule ? 'Reschedule Booking' : 'Book Room'}
+        onBackPress={() => navigation.goBack()}
+        showBackButton
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -293,13 +356,13 @@ const BookRoomScreen = ({ navigation, route }) => {
           {/* Pricing */}
           <View style={styles.pricingContainer}>
             <View style={styles.priceItem}>
-              <Text style={styles.priceValue}>₹{room.price}</Text>
+              <Text style={styles.priceValue}>PKR {room.price}</Text>
               <Text style={styles.priceLabel}>per hour</Text>
             </View>
             <View style={styles.priceDivider} />
             <View style={styles.priceItem}>
               <Text style={[styles.priceValue, { color: '#22C55E' }]}>
-                ₹{room.fullDayPrice || room.price * 7}
+                PKR {room.fullDayPrice || room.price * 7}
               </Text>
               <Text style={styles.priceLabel}>full day</Text>
             </View>
@@ -429,9 +492,11 @@ const BookRoomScreen = ({ navigation, route }) => {
             end={{ x: 1, y: 0 }}
             style={styles.confirmGradient}>
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <Loader size="small" color="#FFFFFF" variant="gradient-spinner" />
             ) : (
-              <Text style={styles.confirmText}>Confirm Booking</Text>
+              <Text style={styles.confirmText}>
+                {isReschedule ? 'Reschedule Booking' : 'Confirm Booking'}
+              </Text>
             )}
           </LinearGradient>
         </TouchableOpacity>
@@ -472,33 +537,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 22,
-    color: '#1F2937',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  placeholder: {
-    width: 44,
   },
   scrollView: {
     flex: 1,

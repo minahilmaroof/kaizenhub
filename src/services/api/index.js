@@ -11,6 +11,7 @@ export { roomsService, bookingsService } from './roomsService';
 export { foodService, ordersService } from './foodService';
 export { dayPassService } from './dayPassService';
 export { invoiceService, walletService } from './invoiceService';
+export { notificationService } from './notificationService';
 export { scheduleService } from './scheduleService';
 
 // Default export with all services

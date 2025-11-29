@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, ActivityIndicator } from 'react-native';
-import colors from '../../../constants/colors'; // optional: use your app colors if available
+import { View, StyleSheet, Image } from 'react-native';
+import colors from '../../../constants/colors';
+import Loader from '../Loader';
 
 function ImageComponent({ source, style, height, width, resizeMode = 'cover' }) {
   const [loading, setLoading] = useState(true);
@@ -18,7 +19,7 @@ function ImageComponent({ source, style, height, width, resizeMode = 'cover' }) 
     >
       {loading && (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={colors?.primary || '#999'} />
+          <Loader size="medium" color={colors?.primary || '#999'} variant="particles" />
         </View>
       )}
 

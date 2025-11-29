@@ -9,7 +9,8 @@ export const scheduleService = {
       ENDPOINTS.SCHEDULE.TODAY,
     );
     const response = await apiClient.get(ENDPOINTS.SCHEDULE.TODAY);
-    console.log('ScheduleService: Raw response received:', response);
+    console.log('ScheduleService: Raw response received:');
+    console.log(JSON.stringify(response, null, 2));
     console.log('ScheduleService: Response type:', typeof response);
     console.log(
       'ScheduleService: Response keys:',

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG } from './config';
+import { authService } from './authService';
 
 const TOKEN_KEY = '@auth_token';
 
@@ -10,16 +11,40 @@ class ApiClient {
   constructor() {
     this.baseUrl = API_CONFIG.BASE_URL;
     this.timeout = API_CONFIG.TIMEOUT;
+    this.logoutHandler = null; // Callback function to handle logout
+  }
+
+  // Set logout handler callback (should be set from AppNavigator or root component)
+  setLogoutHandler(handler) {
+    this.logoutHandler = handler;
   }
 
   // Debug logger
   log(type, message, data = null) {
     if (DEBUG_MODE) {
       const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
-      console.log(` [API ${timestamp}] ${type}`);
-      console.log(`   ${message}`);
-      if (data) {
-        console.log('Data:', JSON.stringify(data, null, 2));
+      console.log(`[API ${timestamp}] ${type}`);
+      console.log(`  ${message}`);
+      if (data !== null && data !== undefined) {
+        // Format data based on its type
+        if (typeof data === 'string') {
+          // Try to parse if it's a JSON string
+          try {
+            const parsed = JSON.parse(data);
+            // Log the parsed object directly - React Native formats objects nicely
+            console.log('Data:', parsed);
+          } catch (e) {
+            // If not JSON, just log as string
+            console.log('Data:', data);
+          }
+        } else if (typeof data === 'object') {
+          // Log object directly - React Native console formats objects nicely
+          // This ensures proper formatting without escaped characters
+          console.log('Data:', data);
+        } else {
+          // For primitives, just log directly
+          console.log('Data:', data);
+        }
       }
     }
   }
@@ -88,6 +113,28 @@ class ApiClient {
       data,
     );
 
+    // Handle 401 Unauthorized - automatically logout user
+    if (response.status === 401) {
+      console.log('401 Unauthorized detected - logging out user');
+      try {
+        // Remove token
+        await this.removeToken();
+        // Call logout handler if set (to handle Redux and navigation)
+        if (this.logoutHandler) {
+          this.logoutHandler();
+        } else {
+          // Fallback: try to call authService logout
+          try {
+            await authService.logout();
+          } catch (logoutError) {
+            console.error('Error during logout:', logoutError);
+          }
+        }
+      } catch (logoutError) {
+        console.error('Error handling 401 logout:', logoutError);
+      }
+    }
+
     if (!response.ok) {
       const error = new Error(
         data?.message || data?.error || 'Something went wrong',
@@ -154,16 +201,27 @@ class ApiClient {
   // PUT request
   async put(endpoint, body = {}, requiresAuth = true) {
     const url = `${this.baseUrl}${endpoint}`;
-    const headers = await this.buildHeaders(requiresAuth);
+    let headers = await this.buildHeaders(requiresAuth);
 
-    // Log request
-    this.log('📤 REQUEST', `PUT ${endpoint}`, body);
+    // Check if body is FormData
+    const isFormData = body instanceof FormData;
+    
+    // If not FormData, stringify JSON and set content-type
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    } else {
+      // For FormData, remove Content-Type to let fetch set it with boundary
+      delete headers['Content-Type'];
+    }
+
+    // Log request (don't log FormData as it's not serializable)
+    this.log('📤 REQUEST', `PUT ${endpoint}`, isFormData ? '[FormData]' : body);
 
     try {
       const response = await fetch(url, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(body),
+        body: isFormData ? body : JSON.stringify(body),
       });
 
       return this.handleResponse(response, 'PUT', endpoint);

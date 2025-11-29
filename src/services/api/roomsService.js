@@ -53,6 +53,13 @@ export const bookingsService = {
     const response = await apiClient.post(ENDPOINTS.BOOKINGS.CANCEL(bookingId));
     return response;
   },
+
+  // Reschedule booking (Update booking)
+  rescheduleBooking: async (bookingId, rescheduleData) => {
+    // rescheduleData: { date, start_time, end_time }
+    const response = await apiClient.put(ENDPOINTS.BOOKINGS.DETAIL(bookingId), rescheduleData);
+    return response;
+  },
 };
 
 export default { roomsService, bookingsService };

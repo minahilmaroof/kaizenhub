@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  ActivityIndicator,
+  RefreshControl,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppBar from '../components/AppBar';
+import Loader from '../components/Loader';
 import { roomsService } from '../../services/api';
 import colors from '../../constants/colors';
 
@@ -50,10 +52,60 @@ const RoomsScreen = ({ navigation }) => {
   const [rooms, setRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Animation values
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const titleTranslateY = useRef(new Animated.Value(20)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentTranslateY = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     fetchRooms();
   }, []);
+
+  // Animate sections when data is loaded
+  useEffect(() => {
+    if (!isLoading) {
+      // Animate Section Title
+      Animated.parallel([
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleTranslateY, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Animate Rooms List with delay
+      if (!error && rooms.length > 0) {
+        Animated.parallel([
+          Animated.timing(contentOpacity, {
+            toValue: 1,
+            duration: 500,
+            delay: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(contentTranslateY, {
+            toValue: 0,
+            duration: 500,
+            delay: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    } else {
+      // Reset animations when loading
+      titleOpacity.setValue(0);
+      titleTranslateY.setValue(20);
+      contentOpacity.setValue(0);
+      contentTranslateY.setValue(20);
+    }
+  }, [isLoading, error, rooms.length]);
 
   const fetchRooms = async () => {
     setIsLoading(true);
@@ -100,26 +152,42 @@ const RoomsScreen = ({ navigation }) => {
     navigation.navigate('BookRoomScreen', { room });
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchRooms();
+    setRefreshing(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <AppBar
         title="Book a Room"
         subtitle="Select your preferred space"
-        onBackPress={() => navigation.goBack()}
+        showBackButton={false}
       />
 
       {/* Section Title */}
-      <Text style={styles.sectionTitle}>Available Rooms</Text>
+      <Animated.View
+        style={{
+          opacity: titleOpacity,
+          transform: [{ translateY: titleTranslateY }],
+        }}
+      >
+        <Text style={styles.sectionTitle}>Available Rooms</Text>
+      </Animated.View>
 
       {/* Rooms List */}
       <ScrollView
         style={styles.roomsList}
         contentContainerStyle={styles.roomsContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <Loader size="large" color={colors.primary} variant="morphing" />
             <Text style={styles.loadingText}>Loading rooms...</Text>
           </View>
         ) : error ? (
@@ -134,7 +202,13 @@ const RoomsScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : rooms.length > 0 ? (
-          rooms.map(room => (
+          <Animated.View
+            style={{
+              opacity: contentOpacity,
+              transform: [{ translateY: contentTranslateY }],
+            }}
+          >
+            {rooms.map(room => (
             <View key={room.id} style={styles.roomCard}>
               {/* Room Image */}
               <View
@@ -151,7 +225,7 @@ const RoomsScreen = ({ navigation }) => {
                 <View style={styles.roomHeader}>
                   <Text style={styles.roomName}>{room.name}</Text>
                   <View style={styles.priceContainer}>
-                    <Text style={styles.roomPrice}>₹{room.price}</Text>
+                    <Text style={styles.roomPrice}>PKR {room.price}</Text>
                     <Text style={styles.priceUnit}>/hour</Text>
                   </View>
                 </View>
@@ -182,7 +256,8 @@ const RoomsScreen = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
             </View>
-          ))
+          ))}
+          </Animated.View>
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No rooms available</Text>
@@ -196,12 +271,12 @@ const RoomsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: colors.textPrimary,
     paddingHorizontal: 20,
     marginBottom: 16,
   },
@@ -211,13 +286,14 @@ const styles = StyleSheet.create({
   roomsContent: {
     paddingHorizontal: 20,
     paddingBottom: 100,
+    flexGrow: 1,
   },
   roomCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 20,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -243,7 +319,7 @@ const styles = StyleSheet.create({
   roomName: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
+    color: colors.textPrimary,
     flex: 1,
   },
   priceContainer: {
@@ -253,11 +329,11 @@ const styles = StyleSheet.create({
   roomPrice: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#4A7CFF',
+    color: colors.primary,
   },
   priceUnit: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
     marginLeft: 2,
   },
   capacityRow: {
@@ -271,7 +347,7 @@ const styles = StyleSheet.create({
   },
   capacityText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
   amenitiesContainer: {
     flexDirection: 'row',
@@ -283,15 +359,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.borderLight,
   },
   amenityText: {
     fontSize: 13,
-    color: '#4B5563',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   bookButton: {
-    backgroundColor: '#4A7CFF',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -299,16 +375,20 @@ const styles = StyleSheet.create({
   bookButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: colors.white,
   },
   loadingContainer: {
-    paddingVertical: 60,
+    minHeight: 400,
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 60,
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 14,
-    color: '#6B7280',
+    fontWeight: '500',
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   errorContainer: {
     paddingVertical: 60,
@@ -317,7 +397,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#EF4444',
+    color: colors.error,
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -330,7 +410,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: colors.white,
   },
   emptyContainer: {
     paddingVertical: 60,
@@ -338,7 +418,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,14 @@ import {
   Dimensions,
   TouchableOpacity,
   Image,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import colors from '../../constants/colors';
 import storage from '../../app/storage';
-
+import Icon from '../components/ImageComponent/IconComponent';
 const { width } = Dimensions.get('window');
 
 const onboardingData = [
@@ -21,30 +23,278 @@ const onboardingData = [
     title: 'Book Your Perfect Space',
     description:
       'Reserve conference rooms, huddle spaces, and meeting rooms with just a few taps',
-    icon: '🚪',
-    iconBg: '#4A7CFF',
-    borderColor: '#4A7CFF',
+   
+    icon: 'door-open',
+    gradient: [colors.primary, colors.primaryLight],
+    type: 'fontAwesome',
+    borderColor: colors.primary,
     placeholderIcon: '🏢',
-    placeholderBg: '#E8F0FF',
+    placeholderBg: colors.statusUpcomingBg,
   },
   {
     id: '2',
     title: 'Order Food & Beverages',
     description:
       'Browse our cafeteria menu and get fresh food delivered right to your desk',
-    icon: '🍴',
-    iconBg: '#F5842C',
-    borderColor: '#F5842C',
+  
+    icon: 'fast-food-outline',
+    gradient: [colors.secondary, colors.secondaryLight],
+    type: 'ionicons',
+    borderColor: colors.secondary,
     placeholderIcon: '🥪',
-    placeholderBg: '#FFF3E8',
+    placeholderBg: colors.statusPendingBg,
   },
 ];
+
+// Animated Pagination Dot Component
+const AnimatedDot = ({ isActive, index }) => {
+  const dotScale = useRef(new Animated.Value(1)).current;
+  const dotOpacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (isActive) {
+      Animated.parallel([
+        Animated.spring(dotScale, {
+          toValue: 1.2,
+          tension: 50,
+          friction: 3,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dotOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        Animated.spring(dotScale, {
+          toValue: 1,
+          tension: 50,
+          friction: 3,
+          useNativeDriver: true,
+        }).start();
+      });
+    } else {
+      Animated.parallel([
+        Animated.timing(dotScale, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dotOpacity, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isActive]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.dot,
+        isActive ? styles.activeDot : styles.inactiveDot,
+        {
+          transform: [{ scale: dotScale }],
+          opacity: dotOpacity,
+        },
+      ]}
+    />
+  );
+};
+
+// Animated Slide Component
+const AnimatedSlide = ({ item, isActive }) => {
+  const imageScale = useRef(new Animated.Value(0)).current;
+  const imageOpacity = useRef(new Animated.Value(0)).current;
+  const iconTranslateY = useRef(new Animated.Value(50)).current;
+  const iconOpacity = useRef(new Animated.Value(0)).current;
+  const titleTranslateY = useRef(new Animated.Value(30)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const descTranslateY = useRef(new Animated.Value(30)).current;
+  const descOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isActive) {
+      // Reset animations
+      imageScale.setValue(0);
+      imageOpacity.setValue(0);
+      iconTranslateY.setValue(50);
+      iconOpacity.setValue(0);
+      titleTranslateY.setValue(30);
+      titleOpacity.setValue(0);
+      descTranslateY.setValue(30);
+      descOpacity.setValue(0);
+
+      // Animate image container (scale + fade)
+      Animated.parallel([
+        Animated.spring(imageScale, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.timing(imageOpacity, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Animate icon (slide up + fade)
+      Animated.parallel([
+        Animated.spring(iconTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          delay: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(iconOpacity, {
+          toValue: 1,
+          duration: 500,
+          delay: 200,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Animate title (slide up + fade)
+      Animated.parallel([
+        Animated.spring(titleTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          delay: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 500,
+          delay: 400,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Animate description (slide up + fade)
+      Animated.parallel([
+        Animated.spring(descTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          delay: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(descOpacity, {
+          toValue: 1,
+          duration: 500,
+          delay: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isActive]);
+
+  return (
+    <View style={styles.slide}>
+      {/* Circular Image with Border */}
+      <Animated.View
+        style={[
+          styles.imageContainer,
+          {
+            borderColor: item.borderColor,
+            transform: [{ scale: imageScale }],
+            opacity: imageOpacity,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.placeholderImage,
+            { backgroundColor: item.placeholderBg },
+          ]}
+        >
+          <Text style={styles.placeholderIcon}>{item.placeholderIcon}</Text>
+        </View>
+      </Animated.View>
+
+      {/* Icon */}
+      <Animated.View
+        style={[
+          styles.iconContainer,
+          {
+            transform: [{ translateY: iconTranslateY }],
+            opacity: iconOpacity,
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={item.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.iconGradient}
+        >
+          <Icon
+            name={item.icon}
+            size={28}
+            color={colors.white}
+            type={item.type}
+          />
+        </LinearGradient>
+      </Animated.View>
+
+      {/* Title */}
+      <Animated.Text
+        style={[
+          styles.title,
+          {
+            transform: [{ translateY: titleTranslateY }],
+            opacity: titleOpacity,
+          },
+        ]}
+      >
+        {item.title}
+      </Animated.Text>
+
+      {/* Description */}
+      <Animated.Text
+        style={[
+          styles.description,
+          {
+            transform: [{ translateY: descTranslateY }],
+            opacity: descOpacity,
+          },
+        ]}
+      >
+        {item.description}
+      </Animated.Text>
+    </View>
+  );
+};
 
 const OnboardingScreen = ({ navigation }) => {
   const flatListRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const buttonScale = useRef(new Animated.Value(1)).current;
 
   const handleNext = () => {
+    // Button press animation
+    Animated.sequence([
+      Animated.timing(buttonScale, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     if (currentIndex < onboardingData.length - 1) {
       flatListRef.current?.scrollToIndex({
         index: currentIndex + 1,
@@ -78,45 +328,14 @@ const OnboardingScreen = ({ navigation }) => {
     itemVisiblePercentThreshold: 50,
   }).current;
 
-  const renderItem = ({ item }) => (
-    <View style={styles.slide}>
-      {/* Circular Image with Border */}
-      <View style={[styles.imageContainer, { borderColor: item.borderColor }]}>
-        {/* Replace this View with Image when you have actual images */}
-        {/* <Image source={item.image} style={styles.image} resizeMode="cover" /> */}
-        <View
-          style={[
-            styles.placeholderImage,
-            { backgroundColor: item.placeholderBg },
-          ]}
-        >
-          <Text style={styles.placeholderIcon}>{item.placeholderIcon}</Text>
-        </View>
-      </View>
-
-      {/* Icon */}
-      <View style={[styles.iconContainer, { backgroundColor: item.iconBg }]}>
-        <Text style={styles.icon}>{item.icon}</Text>
-      </View>
-
-      {/* Title */}
-      <Text style={styles.title}>{item.title}</Text>
-
-      {/* Description */}
-      <Text style={styles.description}>{item.description}</Text>
-    </View>
+  const renderItem = ({ item, index }) => (
+    <AnimatedSlide item={item} isActive={index === currentIndex} />
   );
 
   const renderPagination = () => (
     <View style={styles.pagination}>
       {onboardingData.map((_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.dot,
-            currentIndex === index ? styles.activeDot : styles.inactiveDot,
-          ]}
-        />
+        <AnimatedDot key={index} isActive={index === currentIndex} index={index} />
       ))}
     </View>
   );
@@ -146,24 +365,33 @@ const OnboardingScreen = ({ navigation }) => {
       {renderPagination()}
 
       {/* Button */}
-      <TouchableOpacity
-        style={styles.buttonContainer}
-        onPress={handleNext}
-        activeOpacity={0.9}
+      <Animated.View
+        style={[
+          styles.buttonContainer,
+          {
+            transform: [{ scale: buttonScale }],
+          },
+        ]}
       >
-        <LinearGradient
-          colors={['#4A7CFF', '#9B59B6']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.button}
+        <TouchableOpacity
+          onPress={handleNext}
+          activeOpacity={0.9}
+          style={styles.buttonTouchable}
         >
-          <Text style={styles.buttonText}>
-            {currentIndex === onboardingData.length - 1
-              ? 'Get Started'
-              : 'Next'}
-          </Text>
-        </LinearGradient>
-      </TouchableOpacity>
+          <LinearGradient
+            colors={colors.primaryGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>
+              {currentIndex === onboardingData.length - 1
+                ? 'Get Started'
+                : 'Next'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -219,9 +447,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
+    overflow: 'hidden',
   },
-  icon: {
-    fontSize: 28,
+  iconGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 26,
@@ -250,7 +483,7 @@ const styles = StyleSheet.create({
   },
   activeDot: {
     width: 32,
-    backgroundColor: '#4A7CFF',
+    backgroundColor: colors.primary,
   },
   inactiveDot: {
     width: 8,
@@ -259,6 +492,9 @@ const styles = StyleSheet.create({
   buttonContainer: {
     paddingHorizontal: 24,
     paddingBottom: 32,
+  },
+  buttonTouchable: {
+    width: '100%',
   },
   button: {
     height: 56,

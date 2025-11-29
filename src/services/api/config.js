@@ -1,11 +1,30 @@
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: 'https://4a9e53b59c2a.ngrok-free.app/api',
+  BASE_URL: 'http://smartkaizenapp.onyxtec.io/api',
+  STORAGE_BASE_URL: 'http://smartkaizenapp.onyxtec.io',
   TIMEOUT: 30000,
   HEADERS: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+};
+
+// Helper function to get full image URL
+export const getImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  
+  // If it's already a full URL, return as is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  // If it starts with /, prepend storage base URL
+  if (imagePath.startsWith('/')) {
+    return `${API_CONFIG.STORAGE_BASE_URL}${imagePath}`;
+  }
+  
+  // Otherwise, assume it's a relative path and prepend storage base URL with /
+  return `${API_CONFIG.STORAGE_BASE_URL}/${imagePath}`;
 };
 
 export const ENDPOINTS = {
@@ -57,7 +76,7 @@ export const ENDPOINTS = {
   // Day Passes
   DAY_PASSES: {
     CHECK: '/day-passes/check',
-    PURCHASE: '/day-passes/purchase',
+    PURCHASE: '/day-passes',
     MY_PASSES: '/day-passes',
   },
   
@@ -65,6 +84,7 @@ export const ENDPOINTS = {
   INVOICES: {
     LIST: '/invoices',
     DETAIL: (id) => `/invoices/${id}`,
+    DOWNLOAD: (id) => `/invoices/${id}/download`,
   },
   
   // Wallet
@@ -76,6 +96,17 @@ export const ENDPOINTS = {
   // Schedule
   SCHEDULE: {
     TODAY: '/schedule/today',
+  },
+  
+  // Notifications
+  NOTIFICATIONS: {
+    LIST: '/notifications',
+    UNREAD_COUNT: '/notifications/unread-count',
+    RECENT: '/notifications/recent',
+    MARK_READ: (id) => `/notifications/${id}/read`,
+    MARK_ALL_READ: '/notifications/mark-all-read',
+    DELETE: (id) => `/notifications/${id}`,
+    CLEAR_READ: '/notifications/clear-read',
   },
 };
 
