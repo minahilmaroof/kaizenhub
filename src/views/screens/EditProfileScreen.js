@@ -21,7 +21,7 @@ import colors from '../../constants/colors';
 import { useAppSelector, useAppDispatch } from '../../redux/hooks';
 import { fetchProfileSuccess } from '../../redux/slices/authSlice';
 import { profileService } from '../../services/api';
-import { getImageUrl } from '../../services/api/config';
+import { getImageUrl, isDefaultUserIcon } from '../../services/api/config';
 import { useToast } from '../../contexts/ToastContext';
 
 const EditProfileScreen = ({ navigation, route }) => {
@@ -66,30 +66,30 @@ const EditProfileScreen = ({ navigation, route }) => {
       };
 
       const response = await profileService.updateProfile(updateData);
-
-      if (response.success) {
-        // Update Redux state with updated user data
-        // The API might return the updated user in response.data.user
-        if (response.data?.user) {
-          dispatch(fetchProfileSuccess(response.data.user));
-        } else if (response.data) {
-          // If response.data is the user object directly
-          dispatch(fetchProfileSuccess(response.data));
-        } else {
-          // If no user data in response, fetch fresh profile
-          const profileResponse = await profileService.getProfile();
-          if (profileResponse.success && profileResponse.data?.user) {
-            dispatch(fetchProfileSuccess(profileResponse.data.user));
-          }
-        }
+console.log('response', response)
+      // if (response.success) {
+      //   // Update Redux state with updated user data
+      //   // The API might return the updated user in response.data.user
+      //   if (response.data?.user) {
+      //     dispatch(fetchProfileSuccess(response.data.user));
+      //   } else if (response.data) {
+      //     // If response.data is the user object directly
+      //     dispatch(fetchProfileSuccess(response.data));
+      //   } else {
+      //     // If no user data in response, fetch fresh profile
+      //     const profileResponse = await profileService.getProfile();
+      //     if (profileResponse.success && profileResponse.data?.user) {
+      //       dispatch(fetchProfileSuccess(profileResponse.data.user));
+      //     }
+      //   }
         
-        showToast('Profile updated successfully', 'success');
-        setTimeout(() => {
-          navigation.goBack();
-        }, 1500);
-      } else {
-        setError(response.message || 'Failed to update profile');
-      }
+      //   showToast('Profile updated successfully', 'success');
+      //   setTimeout(() => {
+      //     navigation.goBack();
+      //   }, 1500);
+      // } else {
+      //   setError(response.message || 'Failed to update profile');
+      // }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -116,7 +116,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         >
           {/* Avatar Section */}
           <View style={styles.avatarSection}>
-            {selectedImage || user?.image ? (
+            {selectedImage || (user?.image && !isDefaultUserIcon(user.image)) ? (
               <Image
                 source={{
                   uri: selectedImage?.path || selectedImage?.uri || getImageUrl(user?.image),

@@ -15,7 +15,7 @@ import AppBar from '../components/AppBar';
 import ConfirmationPopup from '../components/ConfirmationPopup';
 import colors from '../../constants/colors';
 import { authService, profileService } from '../../services/api';
-import { getImageUrl } from '../../services/api/config';
+import { getImageUrl, isDefaultUserIcon } from '../../services/api/config';
 import { useAppSelector, useAppDispatch } from '../../redux/hooks';
 import { logout } from '../../redux/slices/authSlice';
 
@@ -147,7 +147,7 @@ const ProfileScreen = ({ navigation }) => {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.profileInfo}>
-            {user?.image ? (
+            {user?.image && !isDefaultUserIcon(user.image) ? (
               <Image
                 source={{ uri: getImageUrl(user.image) }}
                 style={styles.avatarImage}

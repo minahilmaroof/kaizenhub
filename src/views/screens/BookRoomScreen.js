@@ -15,6 +15,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import AppBar from '../components/AppBar';
 import Loader from '../components/Loader';
 import { bookingsService } from '../../services/api';
+import colors from '../../constants/colors';
 
 const timeSlots = [
   '09:00 AM',
@@ -133,6 +134,13 @@ const BookRoomScreen = ({ navigation, route }) => {
     return `${year}-${month}-${day}`;
   };
 
+  const validateTimes = (start, end) => {
+    if (!start || !end) return true; // Allow if either is not set yet
+    const start24 = convertTo24Hour(start);
+    const end24 = convertTo24Hour(end);
+    return start24 < end24;
+  };
+
   const validateBooking = () => {
     if (!selectedDate) {
       setError('Please select a date');
@@ -151,10 +159,8 @@ const BookRoomScreen = ({ navigation, route }) => {
       return false;
     }
     // Validate end time is after start time
-    const start24 = convertTo24Hour(startTime);
-    const end24 = convertTo24Hour(endTime);
-    if (start24 >= end24) {
-      setError('End time must be after start time');
+    if (!validateTimes(startTime, endTime)) {
+      setError('Start time must be before end time');
       return false;
     }
     return true;
@@ -487,7 +493,7 @@ const BookRoomScreen = ({ navigation, route }) => {
           activeOpacity={0.9}
           disabled={isLoading}>
           <LinearGradient
-            colors={['#4A7CFF', '#7C3AED']}
+            colors={colors.primaryGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.confirmGradient}>
@@ -508,7 +514,12 @@ const BookRoomScreen = ({ navigation, route }) => {
         onClose={() => setShowStartTimePicker(false)}
         onSelect={time => {
           setStartTime(time);
-          setError('');
+          // Validate if end time is already selected
+          if (endTime && !validateTimes(time, endTime)) {
+            setError('Start time must be before end time');
+          } else {
+            setError('');
+          }
         }}
         title="Select Start Time"
       />
@@ -517,7 +528,12 @@ const BookRoomScreen = ({ navigation, route }) => {
         onClose={() => setShowEndTimePicker(false)}
         onSelect={time => {
           setEndTime(time);
-          setError('');
+          // Validate if start time is already selected
+          if (startTime && !validateTimes(startTime, time)) {
+            setError('Start time must be before end time');
+          } else {
+            setError('');
+          }
         }}
         title="Select End Time"
       />
@@ -596,11 +612,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#4A7CFF',
+    borderColor: colors.primary,
   },
   amenityText: {
     fontSize: 13,
-    color: '#4A7CFF',
+    color: colors.primary,
     fontWeight: '500',
   },
   pricingContainer: {
@@ -616,7 +632,7 @@ const styles = StyleSheet.create({
   priceValue: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#4A7CFF',
+    color: colors.primary,
   },
   priceLabel: {
     fontSize: 13,
@@ -717,7 +733,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   attendeeButtonPlus: {
-    backgroundColor: '#4A7CFF',
+    backgroundColor: colors.primary,
   },
   attendeeButtonDisabled: {
     opacity: 0.5,

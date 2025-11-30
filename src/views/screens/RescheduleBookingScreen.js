@@ -75,6 +75,13 @@ const RescheduleBookingScreen = ({ navigation, route }) => {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const validateTimes = (start, end) => {
+    if (!start || !end) return true; // Allow if either is not set yet
+    const start24 = convertTo24Hour(start);
+    const end24 = convertTo24Hour(end);
+    return start24 < end24;
+  };
+
   const validateReschedule = () => {
     if (!selectedDate) {
       setError('Please select a date');
@@ -89,10 +96,8 @@ const RescheduleBookingScreen = ({ navigation, route }) => {
       return false;
     }
     // Validate end time is after start time
-    const start24 = convertTo24Hour(startTime);
-    const end24 = convertTo24Hour(endTime);
-    if (start24 >= end24) {
-      setError('End time must be after start time');
+    if (!validateTimes(startTime, endTime)) {
+      setError('Start time must be before end time');
       return false;
     }
     return true;
@@ -353,14 +358,30 @@ const RescheduleBookingScreen = ({ navigation, route }) => {
       <TimePickerModal
         visible={showStartTimePicker}
         onClose={() => setShowStartTimePicker(false)}
-        onSelect={setStartTime}
+        onSelect={time => {
+          setStartTime(time);
+          // Validate if end time is already selected
+          if (endTime && !validateTimes(time, endTime)) {
+            setError('Start time must be before end time');
+          } else {
+            setError('');
+          }
+        }}
         title="Select Start Time"
         selectedTime={startTime}
       />
       <TimePickerModal
         visible={showEndTimePicker}
         onClose={() => setShowEndTimePicker(false)}
-        onSelect={setEndTime}
+        onSelect={time => {
+          setEndTime(time);
+          // Validate if start time is already selected
+          if (startTime && !validateTimes(startTime, time)) {
+            setError('Start time must be before end time');
+          } else {
+            setError('');
+          }
+        }}
         title="Select End Time"
         selectedTime={endTime}
       />

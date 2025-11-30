@@ -27,6 +27,14 @@ export const getImageUrl = (imagePath) => {
   return `${API_CONFIG.STORAGE_BASE_URL}/${imagePath}`;
 };
 
+// Helper function to check if image is the default user icon
+export const isDefaultUserIcon = (imagePath) => {
+  if (!imagePath) return true;
+  const imageUrl = getImageUrl(imagePath);
+  // Check if the URL contains the default user icon path
+  return imageUrl && imageUrl.includes('/images/user-icon.svg');
+};
+
 export const ENDPOINTS = {
   // Authentication
   AUTH: {

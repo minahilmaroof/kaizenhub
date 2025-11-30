@@ -38,16 +38,16 @@ const onboardingData = [
       'Browse our cafeteria menu and get fresh food delivered right to your desk',
   
     icon: 'fast-food-outline',
-    gradient: [colors.secondary, colors.secondaryLight],
+    gradient: ['#F5842C', '#FB923C'],
     type: 'ionicons',
-    borderColor: colors.secondary,
+    borderColor: '#F5842C',
     placeholderIcon: '🥪',
-    placeholderBg: colors.statusPendingBg,
+    placeholderBg: '#FFF3E8',
   },
 ];
 
 // Animated Pagination Dot Component
-const AnimatedDot = ({ isActive, index }) => {
+const AnimatedDot = ({ isActive, index, currentIndex }) => {
   const dotScale = useRef(new Animated.Value(1)).current;
   const dotOpacity = useRef(new Animated.Value(0.3)).current;
 
@@ -89,11 +89,13 @@ const AnimatedDot = ({ isActive, index }) => {
     }
   }, [isActive]);
 
+  const activeColor = currentIndex === 1 ? '#F5842C' : colors.primary;
+
   return (
     <Animated.View
       style={[
         styles.dot,
-        isActive ? styles.activeDot : styles.inactiveDot,
+        isActive ? { ...styles.activeDot, backgroundColor: activeColor } : styles.inactiveDot,
         {
           transform: [{ scale: dotScale }],
           opacity: dotOpacity,
@@ -335,7 +337,7 @@ const OnboardingScreen = ({ navigation }) => {
   const renderPagination = () => (
     <View style={styles.pagination}>
       {onboardingData.map((_, index) => (
-        <AnimatedDot key={index} isActive={index === currentIndex} index={index} />
+        <AnimatedDot key={index} isActive={index === currentIndex} index={index} currentIndex={currentIndex} />
       ))}
     </View>
   );
@@ -379,7 +381,7 @@ const OnboardingScreen = ({ navigation }) => {
           style={styles.buttonTouchable}
         >
           <LinearGradient
-            colors={colors.primaryGradient}
+            colors={currentIndex === 1 ? ['#F5842C', '#FB923C'] : colors.primaryGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.button}

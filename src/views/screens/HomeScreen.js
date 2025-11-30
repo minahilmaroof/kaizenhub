@@ -24,7 +24,7 @@ import {
   authService,
   notificationService,
 } from '../../services/api';
-import { getImageUrl } from '../../services/api/config';
+import { getImageUrl, isDefaultUserIcon } from '../../services/api/config';
 import { useFocusEffect, CommonActions } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
@@ -432,7 +432,7 @@ const HomeScreen = ({ navigation }) => {
               style={styles.avatarButton}
               onPress={() => navigation.navigate('Profile')}
             >
-              {user?.image ? (
+              {user?.image && !isDefaultUserIcon(user.image) ? (
                 <Image
                   source={{ uri: getImageUrl(user.image) }}
                   style={styles.avatarImage}
