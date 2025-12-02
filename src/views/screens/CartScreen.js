@@ -6,12 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import AppBar from '../components/AppBar';
 import Loader from '../components/Loader';
+import ConfirmationPopup from '../components/ConfirmationPopup';
 import { ordersService } from '../../services/api';
 import colors from '../../constants/colors';
 
@@ -22,6 +22,7 @@ const CartScreen = ({ navigation, route }) => {
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [error, setError] = useState('');
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
   // Update cart items when route params change
   useEffect(() => {
@@ -41,7 +42,7 @@ const CartScreen = ({ navigation, route }) => {
 
   const handlePlaceOrder = async () => {
     if (cartItems.length === 0) {
-      Alert.alert('Empty Cart', 'Please add items to your cart before placing an order.');
+      setError('Please add items to your cart before placing an order.');
       return;
     }
 
@@ -68,19 +69,7 @@ const CartScreen = ({ navigation, route }) => {
       const response = await ordersService.createOrder(orderData);
 
       if (response.success) {
-        Alert.alert(
-          'Order Placed!',
-          'Your order has been placed successfully.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Navigate to home or bookings screen
-                navigation.navigate('MainTabs', { screen: 'Home' });
-              },
-            },
-          ]
-        );
+        setShowSuccessPopup(true);
       } else {
         setError(response.message || 'Failed to place order. Please try again.');
       }
@@ -257,6 +246,21 @@ const CartScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Order Success Popup */}
+      <ConfirmationPopup
+        visible={showSuccessPopup}
+        icon="✅"
+        title="Order Placed!"
+        message="Your order has been placed successfully."
+        confirmText="OK"
+        confirmColor="primary"
+        showCancel={false}
+        onConfirm={() => {
+          setShowSuccessPopup(false);
+          navigation.navigate('MainTabs', { screen: 'Bookings' });
+        }}
+      />
     </SafeAreaView>
   );
 };

@@ -476,34 +476,28 @@ const BookingsScreen = ({ navigation }) => {
 
   const renderRoomBooking = item => (
     <View style={styles.bookingCard}>
-      {/* Room Image Placeholder */}
-      <View style={styles.roomImageContainer}>
-        <View style={styles.roomImagePlaceholder}>
-          <Text style={styles.roomImageEmoji}>🏢</Text>
-        </View>
-      </View>
-
       <View style={styles.bookingContent}>
-        <View style={styles.bookingHeader}>
+        <View style={styles.bookingHeaderRow}>
           <View style={styles.bookingIconContainer}>
             <Text style={styles.bookingIcon}>{item.emoji}</Text>
           </View>
-          <View style={styles.bookingTitleContainer}>
-            <Text style={styles.bookingTitle}>{item.title}</Text>
-          </View>
-          <Text style={styles.bookingPrice}>PKR {item.price}</Text>
-        </View>
-
-        <View style={styles.bookingDetails}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>📅</Text>
-            <Text style={styles.detailText}>{item.date}</Text>
-          </View>
-          <View style={styles.detailRowWithStatus}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailIcon}>🕐</Text>
-              <Text style={styles.detailText}>{item.time}</Text>
+          <View style={styles.bookingTitleSection}>
+            <Text style={styles.bookingTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={styles.bookingMetaRow}>
+              <View style={styles.metaPill}>
+                <Text style={styles.metaPillText}>{item.date}</Text>
+              </View>
+              {item.time ? (
+                <View style={styles.metaPill}>
+                  <Text style={styles.metaPillText}>{item.time}</Text>
+                </View>
+              ) : null}
             </View>
+          </View>
+          <View style={styles.bookingPriceSection}>
+            <Text style={styles.bookingPrice}>PKR {item.price}</Text>
             <View
               style={[styles.statusBadge, { backgroundColor: item.statusBg }]}>
               <Text style={[styles.statusText, { color: item.statusColor }]}>
@@ -785,7 +779,7 @@ const styles = StyleSheet.create({
   bookingContent: {
     padding: 16,
   },
-  bookingHeader: {
+  bookingHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
@@ -801,7 +795,7 @@ const styles = StyleSheet.create({
   bookingIcon: {
     fontSize: 18,
   },
-  bookingTitleContainer: {
+  bookingTitleSection: {
     flex: 1,
   },
   bookingTitle: {
@@ -814,9 +808,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  bookingDetails: {
-    marginTop: 12,
-    marginLeft: 52,
+  bookingPriceSection: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
+  },
+  bookingMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 6,
+    gap: 6,
+  },
+  metaPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceLight,
+  },
+  metaPillText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   detailRow: {
     flexDirection: 'row',

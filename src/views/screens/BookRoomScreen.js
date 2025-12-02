@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import AppBar from '../components/AppBar';
 import Loader from '../components/Loader';
+import ConfirmationPopup from '../components/ConfirmationPopup';
 import { bookingsService } from '../../services/api';
 import colors from '../../constants/colors';
 
@@ -97,6 +98,9 @@ const BookRoomScreen = ({ navigation, route }) => {
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successTitle, setSuccessTitle] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const incrementAttendees = () => {
     if (attendees < room.capacity) {
@@ -189,18 +193,11 @@ const BookRoomScreen = ({ navigation, route }) => {
         const response = await bookingsService.rescheduleBooking(bookingId, rescheduleData);
 
         if (response.success) {
-          Alert.alert(
-            'Success',
-            response.message || 'Booking rescheduled successfully!',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  navigation.goBack();
-                },
-              },
-            ],
+          setSuccessTitle('Booking Rescheduled');
+          setSuccessMessage(
+            response.message || 'Your booking has been rescheduled successfully!',
           );
+          setShowSuccessPopup(true);
         } else {
           setError(response.message || 'Failed to reschedule booking. Please try again.');
         }
@@ -220,18 +217,11 @@ const BookRoomScreen = ({ navigation, route }) => {
         const response = await bookingsService.createBooking(newBookingData);
 
         if (response.success) {
-          Alert.alert(
-            'Success',
-            'Room booked successfully!',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  navigation.goBack();
-                },
-              },
-            ],
+          setSuccessTitle('Booking Confirmed');
+          setSuccessMessage(
+            response.message || 'Your room has been booked successfully!',
           );
+          setShowSuccessPopup(true);
         } else {
           setError(response.message || 'Failed to create booking. Please try again.');
         }
@@ -377,7 +367,10 @@ const BookRoomScreen = ({ navigation, route }) => {
 
         {/* Select Date */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Select Date</Text>
+          <Text style={styles.cardTitle}>
+            Select Date
+            <Text style={styles.requiredMark}> *</Text>
+          </Text>
           <TouchableOpacity
             style={styles.dateInput}
             onPress={() => setShowDatePicker(true)}>
@@ -395,7 +388,10 @@ const BookRoomScreen = ({ navigation, route }) => {
 
         {/* Select Time */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Select Time</Text>
+          <Text style={styles.cardTitle}>
+            Select Time
+            <Text style={styles.requiredMark}> *</Text>
+          </Text>
           <View style={styles.timeRow}>
             <View style={styles.timeColumn}>
               <Text style={styles.timeLabel}>Start Time</Text>
@@ -432,7 +428,10 @@ const BookRoomScreen = ({ navigation, route }) => {
 
         {/* Number of Attendees */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Number of Attendees</Text>
+          <Text style={styles.cardTitle}>
+            Number of Attendees
+            <Text style={styles.requiredMark}> *</Text>
+          </Text>
           <View style={styles.attendeesRow}>
             <TouchableOpacity
               style={[
@@ -462,7 +461,10 @@ const BookRoomScreen = ({ navigation, route }) => {
 
         {/* Purpose of Booking */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Purpose of Booking</Text>
+          <Text style={styles.cardTitle}>
+            Purpose of Booking
+            <Text style={styles.requiredMark}> *</Text>
+          </Text>
           <TextInput
             style={styles.purposeInput}
             placeholder="e.g., Team meeting, Client presentation..."
@@ -543,6 +545,26 @@ const BookRoomScreen = ({ navigation, route }) => {
         onSelect={date => {
           setSelectedDate(date);
           setError('');
+        }}
+      />
+
+      {/* Success Confirmation Popup */}
+      <ConfirmationPopup
+        visible={showSuccessPopup}
+        icon="✅"
+        title={successTitle || (isReschedule ? 'Booking Rescheduled' : 'Booking Confirmed')}
+        message={
+          successMessage ||
+          (isReschedule
+            ? 'Your booking has been rescheduled successfully!'
+            : 'Your room has been booked successfully!')
+        }
+        confirmText="OK"
+        confirmColor="primary"
+        showCancel={false}
+        onConfirm={() => {
+          setShowSuccessPopup(false);
+          navigation.pop();
         }}
       />
     </SafeAreaView>
@@ -661,6 +683,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 16,
+  },
+  requiredMark: {
+    color: colors.error,
   },
   dateInput: {
     flexDirection: 'row',

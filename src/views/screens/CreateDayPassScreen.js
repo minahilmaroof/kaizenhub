@@ -14,6 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import AppBar from '../components/AppBar';
 import Loader from '../components/Loader';
 import Icon from '../components/ImageComponent/IconComponent';
+import ConfirmationPopup from '../components/ConfirmationPopup';
 import colors from '../../constants/colors';
 import { dayPassService } from '../../services/api';
 import { useAppSelector } from '../../redux/hooks';
@@ -31,6 +32,7 @@ const CreateDayPassScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('invoice');
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
   // Get wallet balance from user profile (Redux state)
   const walletBalance = user?.wallet_balance ? parseFloat(user.wallet_balance) : null;
@@ -94,18 +96,7 @@ const CreateDayPassScreen = ({ navigation }) => {
       );
 
       if (response.success) {
-        Alert.alert(
-          'Success',
-          response.message || 'Day pass created successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                navigation.goBack();
-              },
-            },
-          ],
-        );
+        setShowSuccessPopup(true);
       } else {
         setError(response.message || 'Failed to create day pass. Please try again.');
       }
@@ -190,7 +181,10 @@ const CreateDayPassScreen = ({ navigation }) => {
 
           {/* Date Selection */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Date</Text>
+            <Text style={styles.fieldLabel}>
+              Date
+              <Text style={styles.requiredMark}> *</Text>
+            </Text>
             <TouchableOpacity
               style={styles.dateInputContainer}
               onPress={() => setShowDatePicker(true)}>
@@ -212,7 +206,10 @@ const CreateDayPassScreen = ({ navigation }) => {
 
           {/* Seat Type Selection */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Seat Type</Text>
+            <Text style={styles.fieldLabel}>
+              Seat Type
+              <Text style={styles.requiredMark}> *</Text>
+            </Text>
             {seatTypes.map((seat) => (
               <TouchableOpacity
                 key={seat.id}
@@ -232,7 +229,10 @@ const CreateDayPassScreen = ({ navigation }) => {
 
           {/* Payment Method Selection */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Payment Method</Text>
+            <Text style={styles.fieldLabel}>
+              Payment Method
+              <Text style={styles.requiredMark}> *</Text>
+            </Text>
             <TouchableOpacity
               style={styles.radioOption}
               onPress={() => setSelectedPaymentMethod('invoice')}>
@@ -282,7 +282,7 @@ const CreateDayPassScreen = ({ navigation }) => {
           onPress={handlePurchase}
           disabled={isLoading || !selectedDate}>
           <LinearGradient
-            colors={[colors.primary, colors.secondary]}
+            colors={colors.primaryGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.purchaseGradient}>
@@ -294,6 +294,21 @@ const CreateDayPassScreen = ({ navigation }) => {
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Success Popup */}
+      <ConfirmationPopup
+        visible={showSuccessPopup}
+        icon="✅"
+        title="Day Pass Created"
+        message="Your day pass has been created successfully."
+        confirmText="OK"
+        confirmColor="primary"
+        showCancel={false}
+        onConfirm={() => {
+          setShowSuccessPopup(false);
+          navigation.pop();
+        }}
+      />
 
       {/* Date Picker */}
       <DatePickerModal
@@ -356,6 +371,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.textPrimary,
     marginBottom: 12,
+  },
+  requiredMark: {
+    color: colors.error,
   },
   dateInputContainer: {
     flexDirection: 'row',

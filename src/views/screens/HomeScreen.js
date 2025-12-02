@@ -10,6 +10,7 @@ import {
   Animated,
   Image,
 } from 'react-native';
+import { ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from '../components/ImageComponent/IconComponent';
@@ -28,6 +29,34 @@ import { getImageUrl, isDefaultUserIcon } from '../../services/api/config';
 import { useFocusEffect, CommonActions } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
+
+const heroSlides = [
+  {
+    id: 'day-pass',
+    title: 'Day Pass Available',
+    subtitle: 'Flexible workspace solutions',
+    gradient: ['#14B8A6', '#0EA5E9'],
+    image: require('../../assets/images/hero1.jpg'),
+
+  },
+  {
+    id: 'premium-workspace',
+    title: 'Premium Workspace',
+    subtitle: 'Book your perfect room today',
+    gradient: ['#8B5CF6', '#6366F1'],
+    // Add your lounge workspace image here
+    // Make sure the image file exists at: src/assets/images/hero-lounge.jpg
+    image: require('../../assets/images/hero2.jpg'),
+  },
+  {
+    id: 'fresh-cafeteria',
+    title: 'Fresh Cafeteria',
+    subtitle: 'Delicious food & beverages',
+    gradient: ['#F97316', '#FB923C'],
+    image: require('../../assets/images/hero3.jpg'),
+
+  },
+];
 
 const quickActions = [
   {
@@ -169,6 +198,11 @@ const HomeScreen = ({ navigation }) => {
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [bookingsCount, setBookingsCount] = useState(0);
+  const [ordersCount, setOrdersCount] = useState(0);
+  const [walletDisplay, setWalletDisplay] = useState('0');
+  const [activeSlide, setActiveSlide] = useState(0);
+  const heroScrollX = useRef(new Animated.Value(0)).current;
   
   // Animation values
   const quickActionsOpacity = useRef(new Animated.Value(0)).current;
@@ -179,15 +213,46 @@ const HomeScreen = ({ navigation }) => {
   // Fetch profile if authenticated but user data is missing
   useEffect(() => {
     const fetchProfile = async () => {
-      if (isAuthenticated && !user) {
-        try {
-          const profileResponse = await profileService.getProfile();
-          if (profileResponse.success && profileResponse.data?.user) {
+      if (!isAuthenticated) return;
+      try {
+        const profileResponse = await profileService.getProfile();
+        if (profileResponse.success && profileResponse.data) {
+          if (profileResponse.data.user && !user) {
             dispatch(fetchProfileSuccess(profileResponse.data.user));
           }
-        } catch (error) {
-          console.error('Error fetching profile in HomeScreen:', error);
+
+          // Stats from profile API (same as ProfileScreen)
+          const bookings = profileResponse.data.bookings_count || 0;
+          const orders = profileResponse.data.orders_count || 0;
+
+          const rawWalletBalance =
+            profileResponse.data.user?.wallet_balance ??
+            user?.wallet_balance ??
+            profileResponse.data.wallet_balance;
+
+          const formatWalletBalance = balance => {
+            if (!balance) return '0';
+            const amount = parseFloat(balance);
+            if (Number.isNaN(amount)) return '0';
+
+            if (amount >= 1000000) {
+              return `${(amount / 1000000).toFixed(1)}M`;
+            }
+            if (amount >= 1000) {
+              const thousands = amount / 1000;
+              return thousands % 1 === 0
+                ? `${thousands}K`
+                : `${thousands.toFixed(1)}K`;
+            }
+            return amount.toFixed(0);
+          };
+
+          setBookingsCount(bookings);
+          setOrdersCount(orders);
+          setWalletDisplay(formatWalletBalance(rawWalletBalance));
         }
+      } catch (error) {
+        console.error('Error fetching profile in HomeScreen:', error);
       }
     };
 
@@ -384,30 +449,8 @@ const HomeScreen = ({ navigation }) => {
             <TouchableOpacity
               style={styles.notificationButton}
               onPress={() => {
-                try {
-                  // Navigate to NotificationScreen using CommonActions for reliability
-                  const rootNavigator = navigation.getParent() || navigation;
-                  if (rootNavigator) {
-                    rootNavigator.dispatch(
-                      CommonActions.navigate({
-                        name: 'NotificationScreen',
-                      })
-                    );
-                  }
-                } catch (error) {
-                  console.error('Navigation error:', error);
-                  // Fallback to simple navigate
-                  try {
-                    const parent = navigation.getParent();
-                    if (parent) {
-                      parent.navigate('NotificationScreen');
-                    } else {
-                      navigation.navigate('NotificationScreen');
-                    }
-                  } catch (fallbackError) {
-                    console.error('Fallback navigation error:', fallbackError);
-                  }
-                }
+                console.log('Notification button pressed');
+                navigation.navigate('NotificationScreen');
               }}
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -446,6 +489,122 @@ const HomeScreen = ({ navigation }) => {
                 </LinearGradient>
               )}
             </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Hero carousel */}
+        <View style={styles.heroSection}>
+          <Animated.ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={styles.heroCarousel}
+            contentContainerStyle={styles.heroCarouselContent}
+            scrollEventThrottle={16}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: heroScrollX } } }],
+              { useNativeDriver: false }
+            )}
+            onMomentumScrollEnd={event => {
+              const index = Math.round(
+                event.nativeEvent.contentOffset.x / (width - 40),
+              );
+              setActiveSlide(index);
+            }}
+          >
+            {heroSlides.map((slide, index) => (
+              <View key={slide.id} style={styles.heroCardWrapper}>
+                <ImageBackground
+                  source={slide.image}
+                  style={styles.heroCard}
+                  imageStyle={styles.heroImage}
+                >
+                  <LinearGradient
+                    colors={slide.gradient.map(color => `${color}CC`)}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.heroOverlay}
+                  >
+                    <View style={styles.heroContent}>
+                      <Text style={styles.heroTitle}>{slide.title}</Text>
+                      <Text style={styles.heroSubtitle}>{slide.subtitle}</Text>
+                    </View>
+                  </LinearGradient>
+                </ImageBackground>
+                <View style={styles.heroDotsContainer}>
+                  {heroSlides.map((dot, dotIndex) => (
+                    <View
+                      key={dot.id}
+                      style={[
+                        styles.heroDot,
+                        dotIndex === activeSlide && styles.heroDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </Animated.ScrollView>
+
+          {/* Stats row */}
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <View style={styles.statTopRow}>
+                <LinearGradient
+                  colors={['#8B5CF6', '#6366F1']}
+                  style={[styles.statIconBubble, styles.statIconShadow]}
+                >
+                  <Icon
+                    name="calendar-day"
+                    size={20}
+                    color="#FFFFFF"
+                    type="fontAwesome"
+                  />
+                </LinearGradient>
+              </View>
+              <Text style={styles.statValue}>{bookingsCount}</Text>
+              <Text style={styles.statLabel}>Bookings</Text>
+            </View>
+
+            <View style={styles.statDivider} />
+
+            <View style={styles.statItem}>
+              <View style={styles.statTopRow}>
+                <LinearGradient
+                  colors={['#F97316', '#FB923C']}
+                  style={[styles.statIconBubble, styles.statIconShadow]}
+                >
+                  <Icon
+                    name="fast-food-outline"
+                    size={22}
+                    color="#FFFFFF"
+                    type="ionicons"
+                  />
+                </LinearGradient>
+              </View>
+              <Text style={styles.statValue}>{ordersCount}</Text>
+              <Text style={styles.statLabel}>Orders</Text>
+            </View>
+
+            <View style={styles.statDivider} />
+
+            <View style={styles.statItem}>
+              <View style={styles.statTopRow}>
+                <LinearGradient
+                  colors={['#0EA5E9', '#22C55E']}
+                  style={[styles.statIconBubble, styles.statIconShadow]}
+                >
+                  <Icon
+                    name="wallet"
+                    size={20}
+                    color="#FFFFFF"
+                    type="ionicons"
+                  />
+                </LinearGradient>
+              </View>
+              <Text style={styles.statValue}>{walletDisplay} PKR</Text>
+              <Text style={styles.statLabel}>Spent</Text>
+            </View>
           </View>
         </View>
 
@@ -551,6 +710,123 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100,
+  },
+  heroSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  heroCarousel: {
+    overflow: 'visible',
+  },
+  heroCarouselContent: {
+    paddingRight: 4,
+  },
+  heroCardWrapper: {
+    width: width - 40,
+    marginRight: 12,
+  },
+  heroCard: {
+    width: '100%',
+    height: 120,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  heroImage: {
+    borderRadius: 24,
+  },
+  heroOverlay: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'space-between',
+    borderRadius: 24,
+  },
+  heroContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.white,
+    marginBottom: 8,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.9)',
+  },
+  heroDotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  heroDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    marginHorizontal: 3,
+  },
+  heroDotActive: {
+    width: 16,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 12,
+  },
+  statTopRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statIconBubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statIconShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: 13,
+    marginTop: 2,
+    color: colors.textSecondary,
   },
   header: {
     flexDirection: 'row',

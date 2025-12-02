@@ -343,7 +343,10 @@ const AuthScreen = ({ navigation }) => {
                 {/* Name Input (Register only) */}
                 {mode === 'register' && (
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Full Name</Text>
+                    <Text style={styles.inputLabel}>
+                      Full Name
+                      <Text style={styles.requiredMark}> *</Text>
+                    </Text>
                     <View
                       style={[
                         styles.inputContainer,
@@ -380,7 +383,10 @@ const AuthScreen = ({ navigation }) => {
 
                 {/* Email Input */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Email Address</Text>
+                  <Text style={styles.inputLabel}>
+                    Email Address
+                    <Text style={styles.requiredMark}> *</Text>
+                  </Text>
                   <View
                     style={[styles.inputContainer, emailError && styles.inputError]}
                   >
@@ -415,7 +421,10 @@ const AuthScreen = ({ navigation }) => {
 
                 {/* Password Input */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Password</Text>
+                  <Text style={styles.inputLabel}>
+                    Password
+                    <Text style={styles.requiredMark}> *</Text>
+                  </Text>
                   <View
                     style={[styles.inputContainer, passwordError && styles.inputError]}
                   >
@@ -747,6 +756,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: 8,
+  },
+  requiredMark: {
+    color: colors.error,
   },
   inputContainer: {
     flexDirection: 'row',

@@ -210,41 +210,70 @@ const RoomsScreen = ({ navigation }) => {
           >
             {rooms.map(room => (
             <View key={room.id} style={styles.roomCard}>
-              {/* Room Image */}
-              <View
-                style={[
-                  styles.roomImageContainer,
-                  { backgroundColor: room.bgColor },
-                ]}
-              >
-                <Text style={styles.roomEmoji}>{room.emoji}</Text>
-              </View>
-
               {/* Room Info */}
               <View style={styles.roomInfo}>
-                <View style={styles.roomHeader}>
-                  <Text style={styles.roomName}>{room.name}</Text>
+                <View style={styles.roomHeaderRow}>
+                  <View
+                    style={[
+                      styles.roomIconContainer,
+                      { backgroundColor: room.bgColor },
+                    ]}
+                  >
+                    <Text style={styles.roomIcon}>{room.emoji}</Text>
+                  </View>
+                  <View style={styles.roomTitleSection}>
+                    <Text style={styles.roomName} numberOfLines={1}>
+                      {room.name}
+                    </Text>
+                    {!!room.type && (
+                      <View style={styles.roomTypeBadge}>
+                        <Text style={styles.roomTypeText}>{room.type}</Text>
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.priceContainer}>
                     <Text style={styles.roomPrice}>PKR {room.price}</Text>
                     <Text style={styles.priceUnit}>/hour</Text>
                   </View>
                 </View>
 
-                <View style={styles.capacityRow}>
-                  <Text style={styles.capacityIcon}>👥</Text>
-                  <Text style={styles.capacityText}>
-                    Up to {room.capacity} people
-                  </Text>
+                <View style={styles.metaRow}>
+                  <View style={styles.capacityRow}>
+                    <Text style={styles.capacityIcon}>👥</Text>
+                    <Text style={styles.capacityText}>
+                      Up to {room.capacity} people
+                    </Text>
+                  </View>
+                  {room.fullDayPrice > 0 && (
+                    <View style={styles.fullDayBadge}>
+                      <Text style={styles.fullDayLabel}>Day Pass</Text>
+                      <Text style={styles.fullDayValue}>
+                        PKR {room.fullDayPrice}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Amenities */}
-                <View style={styles.amenitiesContainer}>
-                  {room.amenities.map((amenity, index) => (
-                    <View key={index} style={styles.amenityChip}>
-                      <Text style={styles.amenityText}>{amenity}</Text>
-                    </View>
-                  ))}
-                </View>
+                {room.amenities?.length > 0 && (
+                  <View style={styles.amenitiesContainer}>
+                    {room.amenities.slice(0, 4).map((amenity, index) => (
+                      <View key={index} style={styles.amenityChip}>
+                        <Text style={styles.amenityDot}>•</Text>
+                        <Text style={styles.amenityText} numberOfLines={1}>
+                          {amenity}
+                        </Text>
+                      </View>
+                    ))}
+                    {room.amenities.length > 4 && (
+                      <View style={[styles.amenityChip, styles.moreAmenitiesChip]}>
+                        <Text style={styles.moreAmenitiesText}>
+                          +{room.amenities.length - 4} more
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
 
                 {/* Book Button */}
                 <TouchableOpacity
@@ -290,56 +319,73 @@ const styles = StyleSheet.create({
   },
   roomCard: {
     backgroundColor: colors.surface,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 20,
+    borderRadius: 16,
+    marginBottom: 16,
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  roomImageContainer: {
-    height: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  roomEmoji: {
-    fontSize: 72,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   roomInfo: {
-    padding: 20,
+    padding: 18,
   },
-  roomHeader: {
+  roomHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  roomIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  roomIcon: {
+    fontSize: 22,
+  },
+  roomTitleSection: {
+    flex: 1,
   },
   roomName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
-    flex: 1,
+    marginBottom: 4,
+  },
+  roomTypeBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceLight,
+  },
+  roomTypeText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.textSecondary,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   roomPrice: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: colors.primary,
   },
   priceUnit: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textSecondary,
     marginLeft: 2,
   },
   capacityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   capacityIcon: {
     fontSize: 14,
@@ -349,22 +395,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  fullDayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#ECFDF5',
+  },
+  fullDayLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.primaryDark,
+    textTransform: 'uppercase',
+    marginRight: 6,
+  },
+  fullDayValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
+  },
   amenitiesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 16,
+    marginBottom: 14,
     gap: 8,
   },
   amenityChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: colors.borderLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceLight,
+  },
+  amenityDot: {
+    fontSize: 10,
+    color: colors.primary,
+    marginRight: 4,
   },
   amenityText: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textSecondary,
     fontWeight: '500',
+    maxWidth: (width - 40) / 2.2,
+  },
+  moreAmenitiesChip: {
+    backgroundColor: 'rgba(40,84,54,0.08)',
+  },
+  moreAmenitiesText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
   },
   bookButton: {
     backgroundColor: colors.primary,

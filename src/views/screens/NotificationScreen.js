@@ -52,6 +52,7 @@ const formatTime = (dateString) => {
 
 // Transform API notification data to display format
 const transformNotification = (notification) => {
+  console.log('notification', notification);
   if (!notification) return null;
   
   return {
@@ -308,6 +309,20 @@ const NotificationScreen = ({ navigation }) => {
   const getNotificationIcon = (type, icon) => {
     // Use icon from API if available
     if (icon) {
+      const normalizedIcon = icon.toLowerCase();
+
+      // Map known backend icon names to correct icon sets
+      if (normalizedIcon === 'shopping-cart') {
+        // FontAwesome shopping cart icon
+        return { name: 'shopping-cart', type: 'fontAwesome' };
+      }
+
+      if (normalizedIcon === 'calendar') {
+        // FontAwesome calendar icon
+        return { name: 'calendar', type: 'fontAwesome' };
+      }
+
+      // Default: assume Ionicons name
       return { name: icon, type: 'ionicons' };
     }
     

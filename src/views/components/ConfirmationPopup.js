@@ -8,6 +8,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import colors from '../../constants/colors';
 
 const ConfirmationPopup = ({
   visible = false,
@@ -28,7 +29,8 @@ const ConfirmationPopup = ({
       case 'success':
         return ['#22C55E', '#16A34A'];
       default:
-        return ['#4A7CFF', '#7C3AED'];
+        // Use app primary gradient (green) by default
+        return colors.primaryGradient || ['#285436', '#3D7A4F'];
     }
   };
 
